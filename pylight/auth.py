@@ -120,6 +120,10 @@ class PasswordAuth(Auth):
             login always runs on a private session so the Rails login cookie
             never leaks into an application-wide cookie jar.
         base_url: Override the auth host. Useful for tests.
+        cookie_jar: Cookie jar for the private login session. The default jar
+            is fine against the real host; override it to reach a host aiohttp
+            declines to set cookies for, such as an IP address or a bare
+            ``localhost`` on aiohttp < 3.10.
         timeout: Total timeout, in seconds, for each auth request.
     """
 
@@ -130,11 +134,13 @@ class PasswordAuth(Auth):
         *,
         session: aiohttp.ClientSession | None = None,
         base_url: str = BASE_URL,
+        cookie_jar: aiohttp.abc.AbstractCookieJar | None = None,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> None:
         self._email = email
         self._password = password
         self._base_url = base_url.rstrip("/")
+        self._cookie_jar = cookie_jar
         self._session = session
         self._owns_session = session is None
         self._timeout = aiohttp.ClientTimeout(total=timeout)
@@ -237,7 +243,9 @@ class PasswordAuth(Auth):
         state = secrets.token_urlsafe(24)
 
         # A private cookie jar: the Rails session cookie is scoped to this flow.
-        async with aiohttp.ClientSession(headers=self._headers()) as session:
+        async with aiohttp.ClientSession(
+            headers=self._headers(), cookie_jar=self._cookie_jar
+        ) as session:
             authorize_params = {
                 "client_id": CLIENT_ID,
                 "response_type": "code",
@@ -248,7 +256,11 @@ class PasswordAuth(Auth):
                 "code_challenge_method": "S256",
             }
             page, _, code = await self._follow(
-                session, "GET", f"{self._base_url}/oauth/authorize", params=authorize_params
+                session,
+                "GET",
+                f"{self._base_url}/oauth/authorize",
+                params=authorize_params,
+                state=state,
             )
             if code is None:
                 if page is None:

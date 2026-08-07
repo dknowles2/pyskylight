@@ -5,8 +5,16 @@ on:
     branches: [main]
   pull_request:
 
+# A second push to a PR makes the first run irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   UV_FROZEN: "1"
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -21,7 +29,33 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync --python ${{ matrix.python-version }}
-      - run: uv run pytest
+      - name: Test with coverage
+        run: uv run pytest --cov --cov-report=term --cov-report=xml
+      - name: Coverage summary
+        if: always()
+        run: |
+          uv run coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: matrix.python-version == '3.12'
+        with:
+          name: coverage-xml
+          path: coverage.xml
+
+  lowest-versions:
+    # The dependency floors in pyproject.toml are a claim; this checks it.
+    # A resolved lock can't express them — it has to satisfy every supported
+    # Python, which rules out the oldest aiohttp — so install the floor
+    # directly on the oldest interpreter instead.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv venv --python 3.10
+      - run: uv pip install "aiohttp==3.9.0" pytest pytest-asyncio
+      - run: uv pip install --no-deps -e .
+      - run: .venv/bin/python -m pytest -q
 
   lint:
     runs-on: ubuntu-latest
@@ -31,9 +65,28 @@ jobs:
         with:
           enable-cache: true
       - run: uv sync
-      - run: uv run ruff check .
+      - run: uv run ruff check --output-format=github .
       - run: uv run ruff format --check .
       - run: uv run mypy pylight
+
+  pre-commit:
+    # Catches anything a contributor committed with --no-verify.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv sync
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: Run hooks
+        # mypy and pytest have dedicated jobs above; no need to pay twice.
+        env:
+          SKIP: mypy,pytest
+        run: uv run pre-commit run --all-files --show-diff-on-failure
 
   build:
     runs-on: ubuntu-latest
@@ -41,6 +94,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv build
+      - name: Check package metadata
+        run: uvx twine check dist/*
       - uses: actions/upload-artifact@v4
         with:
           name: dist
