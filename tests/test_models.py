@@ -3,24 +3,37 @@
 from datetime import date, datetime, timedelta, timezone
 
 from pylight.jsonapi import Document
-from pylight.models import Category, Chore, ListItem, SkylightList, Token, User
+from pylight.models import (
+    Category,
+    Chore,
+    ChoreGroups,
+    ListItem,
+    RewardPoint,
+    SkylightList,
+    Token,
+    User,
+)
 
-# From mightybandito/Skylight examples/get-chores-redacted.json.
+# Shape taken from a live capture: the occurrence id is "<group>-<date>", the
+# addressable chore id is `group`, and recurrence_set is a list.
 CHORES_DOC = {
     "data": [
         {
             "type": "chore",
             "id": "9001-2025-08-25",
             "attributes": {
-                "id": 9001,
+                "id": "9001-2025-08-25",
+                "group": "9001",
+                "series": "9001",
                 "summary": "Recycling",
                 "status": "pending",
                 "start": "2025-08-25",
-                "is_future": False,
+                "up_for_grabs": False,
                 "recurring": True,
-                "recurrence_set": "RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;WKST=SU",
+                "recurrence_set": ["RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;WKST=SU"],
                 "start_time": None,
                 "completed_on": None,
+                "completed_at": None,
                 "unmodeled_field": "kept in .attributes",
             },
             "relationships": {"category": {"data": {"type": "category", "id": "77"}}},
@@ -30,7 +43,16 @@ CHORES_DOC = {
         {
             "type": "category",
             "id": "77",
-            "attributes": {"label": "Alex", "color": "#A6A6BE", "linked_to_profile": True},
+            "attributes": {
+                "id": 77,
+                "label": "Alex",
+                "color": "#A6A6BE",
+                "linked_to_profile": True,
+                "profile_picture_urls": {
+                    "small": "https://example.invalid/s.jpg",
+                    "original": "https://example.invalid/o.jpg",
+                },
+            },
         }
     ],
 }
@@ -39,10 +61,12 @@ CHORES_DOC = {
 def test_chore_decoding():
     (chore,) = Chore.from_document(CHORES_DOC)
     assert chore.id == "9001-2025-08-25"
-    assert chore.chore_id == 9001
+    assert chore.chore_id == "9001"
+    assert chore.series == "9001"
     assert chore.summary == "Recycling"
     assert chore.start == date(2025, 8, 25)
     assert chore.recurring is True
+    assert chore.recurrence_set == ["RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;WKST=SU"]
     assert chore.start_time is None
     assert chore.category_id == "77"
     assert chore.completed is False
@@ -59,6 +83,7 @@ def test_completed_chore():
     }
     chore = Chore.one_from_document(doc)
     assert chore.completed is True
+    assert chore.completed_on == date(2025, 8, 25)
 
 
 def test_missing_attributes_default_to_none():
@@ -73,6 +98,8 @@ def test_category_decoding():
     (resource,) = document.included_of("category")
     category = Category.from_resource(resource)
     assert (category.id, category.label, category.color) == ("77", "Alex", "#A6A6BE")
+    assert category.category_id == 77
+    assert category.profile_picture_url == "https://example.invalid/o.jpg"
     assert document.find_included("category", "77") == resource
     assert document.find_included("category", "nope") is None
 
@@ -143,3 +170,72 @@ def test_token_expiry():
     assert Token(access_token="a", expires_at=now - timedelta(seconds=1)).is_expired
     assert not Token(access_token="a", expires_at=now + timedelta(hours=1)).is_expired
     assert not Token(access_token="a").is_expired
+
+
+def test_chore_groups_buckets():
+    groups = ChoreGroups.from_response(
+        {
+            "chores": {
+                "late": {"data": [{"type": "chore", "id": "1-2025-08-01"}], "included": []},
+                "today": {"data": [{"type": "chore", "id": "2-2025-08-07"}]},
+                "future": {"data": []},
+            },
+            "routines": {"today": {"data": [{"type": "chore", "id": "3-2025-08-07"}]}},
+        }
+    )
+    assert sorted(groups.chores) == ["future", "late", "today"]
+    assert [c.id for c in groups.chores["late"]] == ["1-2025-08-01"]
+    assert [c.id for c in groups.routines["today"]] == ["3-2025-08-07"]
+    assert len(groups.all) == 3
+
+
+def test_chore_groups_tolerates_missing_keys():
+    assert ChoreGroups.from_response({}).all == []
+    assert ChoreGroups.from_response(None).all == []
+
+
+def test_reward_points_from_plain_array():
+    (point,) = RewardPoint.from_response(
+        [{"category_id": 21505173, "lifetime_points_earned": 12, "current_point_balance": 4}]
+    )
+    assert point.category_id == 21505173
+    assert point.current_point_balance == 4
+    assert point.lifetime_points_earned == 12
+
+
+def test_user_name_falls_back_to_profile():
+    user = User.from_response(
+        {"id": 12, "email": "me@example.com", "profile": {"id": 5, "name": "Alex"}}
+    )
+    assert user.name == "Alex"
+    assert user.profile["id"] == 5
+
+
+def test_calendar_event_handles_both_category_relationship_shapes():
+    from pylight.models import CalendarEvent
+
+    singular = CalendarEvent.from_resource(
+        {
+            "type": "calendar_event",
+            "id": "1",
+            "attributes": {"summary": "Dentist", "starts_at": "2026-08-07T14:00:00Z"},
+            "relationships": {"category": {"data": {"type": "category", "id": "77"}}},
+        }
+    )
+    assert singular.category_id == "77"
+    assert singular.category_ids == []
+    assert singular.starts_at == datetime(2026, 8, 7, 14, 0, tzinfo=timezone.utc)
+
+    plural = CalendarEvent.from_resource(
+        {
+            "type": "calendar_event",
+            "id": "2",
+            "attributes": {"rrule": ["RRULE:FREQ=DAILY"]},
+            "relationships": {
+                "categories": {"data": [{"type": "category", "id": "77"}]},
+            },
+        }
+    )
+    assert plural.category_ids == ["77"]
+    assert plural.category_id is None
+    assert plural.rrule == ["RRULE:FREQ=DAILY"]

@@ -26,6 +26,7 @@ from .models import (
     CalendarEvent,
     Category,
     Chore,
+    ChoreGroups,
     Device,
     Frame,
     ListItem,
@@ -286,13 +287,17 @@ class Skylight:
         """Get a single frame."""
         return Frame.one_from_document(await self._get(f"{API_PREFIX}/frames/{frame_id}"))
 
-    async def get_calendar_frame(self) -> Frame:
-        """Get the user's primary calendar frame."""
-        return Frame.one_from_document(await self._get(f"{API_PREFIX}/frames/calendar"))
+    async def get_calendar_frames(self) -> list[Frame]:
+        """List the frames the user can see the calendar for.
 
-    async def get_photo_frame(self) -> Frame:
-        """Get the user's primary photo frame."""
-        return Frame.one_from_document(await self._get(f"{API_PREFIX}/frames/photo"))
+        Despite the singular-looking path, this returns a collection of
+        ``approved_viewer_frame`` resources.
+        """
+        return Frame.from_document(await self._get(f"{API_PREFIX}/frames/calendar"))
+
+    async def get_photo_frames(self) -> list[Frame]:
+        """List the frames the user can see photos for."""
+        return Frame.from_document(await self._get(f"{API_PREFIX}/frames/photo"))
 
     async def update_frame(self, frame_id: str | int, **fields: Any) -> _JSON:
         """Update frame settings."""
@@ -391,9 +396,15 @@ class Skylight:
             )
         )
 
-    async def get_all_chores(self, frame_id: str | int, **params: Any) -> list[Chore]:
-        """List all chores, including unassigned ("up for grabs") ones."""
-        return Chore.from_document(
+    async def get_all_chores(self, frame_id: str | int, **params: Any) -> ChoreGroups:
+        """Get every chore, bucketed by urgency.
+
+        This endpoint does not return a JSON:API document: chores arrive grouped
+        under ``late``, ``today``, ``today_timed``, ``any_day``, and ``future``,
+        with routines in a parallel structure. See
+        :class:`~pylight.models.ChoreGroups`.
+        """
+        return ChoreGroups.from_response(
             await self._get(f"{API_PREFIX}/frames/{frame_id}/chores/all", **params)
         )
 
@@ -834,10 +845,20 @@ class Skylight:
             await self._get(f"{API_PREFIX}/frames/{frame_id}/calendar_events/search", q=query)
         )
 
-    async def get_countdowns(self, frame_id: str | int) -> list[CalendarEvent]:
-        """List countdown events."""
+    async def get_countdowns(self, frame_id: str | int, timezone: str) -> list[CalendarEvent]:
+        """List countdown events.
+
+        Args:
+            frame_id: The frame to query.
+            timezone: IANA timezone name. Required by the API — a missing value
+                is rejected with ``422 Timezone is required``. The frame's own
+                :attr:`Frame.timezone` is the usual choice.
+        """
         return CalendarEvent.from_document(
-            await self._get(f"{API_PREFIX}/frames/{frame_id}/calendar_events/countdowns")
+            await self._get(
+                f"{API_PREFIX}/frames/{frame_id}/calendar_events/countdowns",
+                timezone=timezone,
+            )
         )
 
     async def get_source_calendars(self, frame_id: str | int) -> list[SourceCalendar]:
@@ -1007,8 +1028,11 @@ class Skylight:
         )
 
     async def get_reward_points(self, frame_id: str | int) -> list[RewardPoint]:
-        """Get reward point balances."""
-        return RewardPoint.from_document(
+        """Get per-profile reward point balances.
+
+        This endpoint returns a plain JSON array, not a JSON:API document.
+        """
+        return RewardPoint.from_response(
             await self._get(f"{API_PREFIX}/frames/{frame_id}/reward_points")
         )
 
@@ -1020,9 +1044,20 @@ class Skylight:
 
     # ----------------------------------------------------------------- nudges
 
-    async def get_nudges(self, frame_id: str | int) -> list[Nudge]:
-        """List nudges (reminders)."""
-        return Nudge.from_document(await self._get(f"{API_PREFIX}/frames/{frame_id}/nudges"))
+    async def get_nudges(
+        self, frame_id: str | int, after: date | str, before: date | str
+    ) -> list[Nudge]:
+        """List nudges (reminders) in a date range.
+
+        Args:
+            frame_id: The frame to query.
+            after: Earliest date to include.
+            before: Latest date to include. Both bounds are required by the API,
+                which rejects a missing one with ``422 After/Before is required``.
+        """
+        return Nudge.from_document(
+            await self._get(f"{API_PREFIX}/frames/{frame_id}/nudges", after=after, before=before)
+        )
 
     async def create_nudge(self, frame_id: str | int, **fields: Any) -> _JSON:
         """Create a nudge."""
@@ -1102,9 +1137,22 @@ class Skylight:
             f"{API_PREFIX}/frames/{frame_id}/meals/recipes/{recipe_id}/add_to_grocery_list",
         )
 
-    async def get_meal_sittings(self, frame_id: str | int) -> _JSON:
-        """Get meal plan slots."""
-        return await self._get(f"{API_PREFIX}/frames/{frame_id}/meals/sittings")
+    async def get_meal_sittings(
+        self, frame_id: str | int, date_min: date | str, date_max: date | str
+    ) -> _JSON:
+        """Get meal plan slots in a date range.
+
+        Args:
+            frame_id: The frame to query.
+            date_min: Start of the range. Required by the API — a missing value
+                is rejected with ``422 Date min is required``.
+            date_max: End of the range.
+        """
+        return await self._get(
+            f"{API_PREFIX}/frames/{frame_id}/meals/sittings",
+            date_min=date_min,
+            date_max=date_max,
+        )
 
     # -------------------------------------------------------------- utilities
 

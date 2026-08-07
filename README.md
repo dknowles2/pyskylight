@@ -101,7 +101,23 @@ events = await skylight.get_calendar_events(
 ```
 
 Recurring chores are returned one resource per occurrence. `Chore.id` is the occurrence
-id (`"<chore_id>-<date>"`); pass `Chore.chore_id` when updating, deleting, or completing.
+id (`"<chore_id>-<date>"`); pass `Chore.chore_id` — the `group` attribute — when updating,
+deleting, or completing.
+
+A few endpoints don't follow the usual shapes, and pylight normalizes them:
+
+```python
+groups = await skylight.get_all_chores(frame_id)  # ChoreGroups, bucketed
+groups.chores["late"], groups.chores["today"], groups.routines["today_timed"]
+groups.all  # flattened
+
+balances = await skylight.get_reward_points(frame_id)  # plain array upstream
+frames = await skylight.get_calendar_frames()  # a list, despite the path
+```
+
+Some endpoints reject requests that omit an optional-looking parameter, so pylight makes
+those required: `get_countdowns(frame_id, timezone)`, `get_nudges(frame_id, after, before)`,
+`get_meal_sittings(frame_id, date_min, date_max)`.
 
 ## Models and unmodeled fields
 
@@ -111,11 +127,11 @@ The upstream schema is observed, not specified, so every model keeps its raw res
 chore.attributes["some_field_pylight_does_not_know_about"]
 ```
 
-Fully typed models: `Chore`, `Category`, `SkylightList`, `ListItem`, `TaskBoxItem`.
-Thin models (id plus `.attributes`) where no response body has been captured yet:
-`Frame`, `Device`, `CalendarEvent`, `SourceCalendar`, `Reward`, `RewardPoint`, `Nudge`,
-`Alarm`. Endpoints whose shape is entirely unknown (meals, photos, Plus, activities)
-return the decoded JSON untouched.
+Fully typed models, all verified against live responses: `Frame`, `Category`, `Chore`,
+`TaskBoxItem`, `SkylightList`, `ListItem`, `Device`, `CalendarEvent`, `SourceCalendar`,
+`Reward`, `RewardPoint`, `User`. Thin models (id plus `.attributes`) where the account
+used for verification had no data to capture: `Nudge`, `Alarm`. Endpoints whose shape is
+entirely unknown (meals, photos, Plus, activities) return the decoded JSON untouched.
 
 Anything not wrapped is still reachable:
 
