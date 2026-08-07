@@ -25,17 +25,17 @@ classifiers = [
 ]
 dependencies = ["aiohttp>=3.9"]
 
-[project.optional-dependencies]
+[project.urls]
+Homepage = "https://github.com/dknowles2/pylight"
+Issues = "https://github.com/dknowles2/pylight/issues"
+
+[dependency-groups]
 dev = [
     "mypy>=1.10",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "ruff>=0.5",
 ]
-
-[project.urls]
-Homepage = "https://github.com/dknowles2/pylight"
-Issues = "https://github.com/dknowles2/pylight/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["pylight"]
