@@ -39,11 +39,14 @@ __all__ = [
 
 
 class ChoreStatus:
-    """Known values for :attr:`Chore.status` and chore completions."""
+    """Values accepted by the chore completions endpoint.
 
+    The API accepts ``"complete"``, not ``"completed"``; ``"skipped"`` is
+    rejected. :attr:`Chore.status` on a fetched chore reads ``"pending"``.
+    """
+
+    COMPLETE = "complete"
     PENDING = "pending"
-    COMPLETED = "completed"
-    SKIPPED = "skipped"
 
 
 class ListItemStatus:
@@ -139,7 +142,7 @@ class Chore(ApiObject):
         return (
             self.completed_on is not None
             or self.completed_at is not None
-            or self.status == ChoreStatus.COMPLETED
+            or self.status in (ChoreStatus.COMPLETE, "completed")
         )
 
 
@@ -406,10 +409,16 @@ class RewardPoint:
 
 @dataclass(frozen=True, kw_only=True)
 class Nudge(ApiObject):
-    """A nudge (reminder) configured on a frame.
+    """A nudge — a spoken reminder played on the frame at a set time."""
 
-    No nudge body has been captured yet; read :attr:`attributes`.
-    """
+    nudge_id: int | None = field(default=None, metadata=alias("id"))
+    body: str | None = None
+    deliver_at: datetime | None = None
+    recurring: bool | None = None
+    recurring_until: datetime | None = None
+    rrule: list[str] = field(default_factory=list)
+    voice_kind: str | None = None
+    audio_url: str | None = None
 
 
 @dataclass(frozen=True, kw_only=True)

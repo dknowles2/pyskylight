@@ -81,14 +81,14 @@ categories = await skylight.get_categories(frame_id)
 chore = await skylight.create_chore(
     frame_id,
     "Take out recycling",
+    categories[0].id,  # a chore must belong to a profile
     start="2025-09-01",
     start_time="10:00",
     recurring=True,
     recurrence_set="RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;WKST=SU",
-    category_id=categories[0].id,
 )
 await skylight.complete_chore(frame_id, chore.chore_id, instance_date="2025-09-01")
-await skylight.delete_chore(frame_id, chore.chore_id, apply_to=ApplyTo.ALL)
+await skylight.delete_chore(frame_id, chore.chore_id, apply_to=ApplyTo.ALL)  # recurring only
 
 # Lists
 grocery = await skylight.get_list(frame_id, list_id)  # items + sections resolved
@@ -119,6 +119,12 @@ Some endpoints reject requests that omit an optional-looking parameter, so pylig
 those required: `get_countdowns(frame_id, timezone)`, `get_nudges(frame_id, after, before)`,
 `get_meal_sittings(frame_id, date_min, date_max)`.
 
+Write calls send flat bodies, not JSON:API documents, and several have sharp edges the
+published spec does not mention — `"complete"` rather than `"completed"`, `apply_to` being
+forbidden on one-time chores, `move_chore` taking a neighbour instead of an index. All of
+it is verified against a live test frame and written up in
+[docs/api-notes.md](docs/api-notes.md).
+
 ## Models and unmodeled fields
 
 The upstream schema is observed, not specified, so every model keeps its raw resource:
@@ -129,8 +135,8 @@ chore.attributes["some_field_pylight_does_not_know_about"]
 
 Fully typed models, all verified against live responses: `Frame`, `Category`, `Chore`,
 `TaskBoxItem`, `SkylightList`, `ListItem`, `Device`, `CalendarEvent`, `SourceCalendar`,
-`Reward`, `RewardPoint`, `User`. Thin models (id plus `.attributes`) where the account
-used for verification had no data to capture: `Nudge`, `Alarm`. Endpoints whose shape is
+`Reward`, `RewardPoint`, `Nudge`, `User`. Thin models (id plus `.attributes`) where the
+account used for verification had no data to capture: `Alarm`. Endpoints whose shape is
 entirely unknown (meals, photos, Plus, activities) return the decoded JSON untouched.
 
 Anything not wrapped is still reachable:
