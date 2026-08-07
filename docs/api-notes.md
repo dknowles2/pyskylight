@@ -71,11 +71,12 @@ Cosmetic, but worth knowing if you tool against it.
 
 Facts only the OpenAPI spec and its examples record:
 
-- **Chore ids are per-occurrence.** `chore.id` is `"<chore_id>-<date>"` while
-  `chore.attributes.id` is the underlying integer chore id. pylight surfaces the
-  latter as `Chore.chore_id`, which is what update/delete/completion calls need.
-- **`recurrence_set` is an RRULE string**, e.g.
-  `"RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;WKST=SU"`.
+- **Chore ids are per-occurrence.** `chore.id` is `"<chore_id>-<date>"`. The spec
+  says the underlying id is `chore.attributes.id`; live traffic says otherwise —
+  see the corrections below.
+- **`recurrence_set` holds RRULEs**, e.g.
+  `"RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;WKST=SU"` (a list, not a string — see
+  below).
 - **Colors are `#RRGGBB`**, though one captured example (`get-lists-listid.json`)
   shows a 7-character value with no `#`, so treat the leading `#` as optional.
 - **`list.kind`** is `shopping` or `to_do`; **`list_item.status`** is `pending` or
@@ -115,7 +116,7 @@ single frame — the resource type is `approved_viewer_frame`. Hence
 **`/chores/all` is not a JSON:API document.** It returns
 `{"chores": {...}, "routines": {...}}`, each bucketed into `late`, `today`,
 `today_timed`, `any_day`, and `future`, each bucket its own `{data, included}`
-document. Modeled as :class:`ChoreGroups`.
+document. Modeled as `ChoreGroups`.
 
 **`/reward_points` is a plain JSON array** of
 `{category_id, current_point_balance, lifetime_points_earned}` — no JSON:API
