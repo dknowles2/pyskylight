@@ -1,6 +1,6 @@
 # API sources and where they disagree
 
-pylight is built from two independent reverse-engineering efforts:
+pyskylight is built from two independent reverse-engineering efforts:
 
 | Source | What it is | Strength |
 |---|---|---|
@@ -37,28 +37,28 @@ WebCal, meals, nudges, photos/albums, rewards CRUD and redemption, Sidekick
 actual flow: OAuth 2.0 authorization code + PKCE against `/oauth/authorize` and
 `/oauth/token`, with credentials posted to a Rails login form at `/auth/session`.
 
-*pylight follows the gist* and implements the flow end to end
-([`pylight/auth.py`](../pylight/auth.py)). The `Basic` scheme in the spec is
+*pyskylight follows the gist* and implements the flow end to end
+([`pyskylight/auth.py`](../pyskylight/auth.py)). The `Basic` scheme in the spec is
 almost certainly a legacy token seen in older captures — note the gist's
 `POST /api/oauth/legacy_token_exchange`. `TokenAuth` covers that case: pass any
-pre-obtained token and pylight sends it as a bearer token.
+pre-obtained token and pyskylight sends it as a bearer token.
 
 **Creating chores.** The spec documents `POST /api/frames/{frameId}/chores` with
 a JSON:API single-resource body, and ships a captured example. The gist lists
 only `POST /api/frames/{frameId}/chores/create_multiple`. Both are plausible —
 the app likely uses the bulk endpoint while the singular one still exists.
 
-*pylight exposes both*: `create_chore()` (JSON:API, matches the captured example)
+*pyskylight exposes both*: `create_chore()` (JSON:API, matches the captured example)
 and `create_chores()` (bulk).
 
 **Task box.** The spec has only `POST .../task_box/items`; the gist adds `GET`,
-`PATCH`, and `DELETE`. pylight implements all four, with the response typed from
+`PATCH`, and `DELETE`. pyskylight implements all four, with the response typed from
 the spec's `TaskBoxItemAttributes`.
 
 **Headers.** The spec mentions none beyond `Authorization`. The gist records that
 every app request sends `User-Agent: SkylightMobile (web)` and
-`Skylight-Api-Version: 2026-05-01` alongside `Accept: application/json`. pylight
-sends all four on every request; see [`pylight/const.py`](../pylight/const.py).
+`Skylight-Api-Version: 2026-05-01` alongside `Accept: application/json`. pyskylight
+sends all four on every request; see [`pyskylight/const.py`](../pyskylight/const.py).
 
 **Base URL.** Same host either way: the spec's server is
 `https://app.ourskylight.com` with paths including `/api`; the gist quotes the
@@ -84,7 +84,7 @@ Facts only the OpenAPI spec and its examples record:
 - **`GET .../lists/{listId}`** returns list items under `included` and sections
   under `meta.sections`. `SkylightList` from `get_list()` resolves both.
 - **304 Not Modified** is documented on nearly every GET, so the API is
-  conditional-request aware. pylight returns `None` (or an empty list) rather
+  conditional-request aware. pyskylight returns `None` (or an empty list) rather
   than treating it as an error; it does not yet send `If-None-Match`.
 - **`calendar_events`** requires `date_min` and `date_max`, and accepts an
   `include` CSV of `categories,calendar_account,event_notification_setting`.
@@ -96,7 +96,7 @@ resource — is preserved verbatim on each model as `.attributes`.
 
 ## Verified against a live account
 
-Every non-destructive (GET) call in pylight was run against a real Skylight
+Every non-destructive (GET) call in pyskylight was run against a real Skylight
 account — 36/36 succeed. That pass corrected both sources:
 
 **Chore ids.** `attributes.id` is *not* the numeric chore id the spec implies; it
@@ -131,7 +131,7 @@ required**, with a 422:
 | `nudges` | `after` **and** `before` | `After is required` / `Before is required` |
 | `meals/sittings` | `date_min`, `date_max` | `Date min is required` |
 
-pylight makes all of these required arguments.
+pyskylight makes all of these required arguments.
 
 **Relationship names vary by endpoint.** `calendar_events` side-loads
 `categories` (plural, to-many) while `countdowns` returns `category` (singular).
@@ -180,7 +180,7 @@ outright (`must be blank`).
 
 **`apply_to` is conditional.** `DELETE /chores/{id}` rejects it on a one-time
 chore with `400 one-time chores should not have a value for apply_to`, and needs
-it for recurring ones. It is optional on update. pylight defaults it to unset.
+it for recurring ones. It is optional on update. pyskylight defaults it to unset.
 
 **Move takes a neighbour, not an index.** Every scalar form of `position` fails
 with `422 Position is required` — including query and form encodings. The real
@@ -195,7 +195,7 @@ reminders, with `voice_kind` and `audio_url` fields.
 
 **Create responses vary.** `POST /chores` and most creates return a single
 resource under `data`; `POST /chores/create_multiple` and `POST /rewards` return
-a **list**. pylight returns `list[Chore]` and `list[Reward]` for those two.
+a **list**. pyskylight returns `list[Chore]` and `list[Reward]` for those two.
 
 **Colors are validated** against the palette from `GET /api/colors`; an
 arbitrary hex is rejected with `Color is invalid`.

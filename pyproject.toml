@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "pylight"
+name = "pyskylight"
 version = "0.1.0"
 description = "Async Python client for the (unofficial) Skylight API"
 readme = "README.md"
@@ -26,8 +26,8 @@ classifiers = [
 dependencies = ["aiohttp>=3.9"]
 
 [project.urls]
-Homepage = "https://github.com/dknowles2/pylight"
-Issues = "https://github.com/dknowles2/pylight/issues"
+Homepage = "https://github.com/dknowles2/pyskylight"
+Issues = "https://github.com/dknowles2/pyskylight/issues"
 
 [dependency-groups]
 dev = [
@@ -41,7 +41,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["pylight"]
+packages = ["pyskylight"]
 
 [tool.ruff]
 line-length = 100
@@ -72,7 +72,7 @@ testpaths = ["tests"]
 addopts = "--strict-markers --strict-config"
 
 [tool.coverage.run]
-source = ["pylight"]
+source = ["pyskylight"]
 branch = true
 
 [tool.coverage.report]

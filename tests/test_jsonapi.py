@@ -11,7 +11,7 @@ from typing import Any
 
 import pytest
 
-from pylight.jsonapi import ApiObject, Document, alias, relationship, relationships
+from pyskylight.jsonapi import ApiObject, Document, alias, relationship, relationships
 
 
 @dataclass(frozen=True, kw_only=True)

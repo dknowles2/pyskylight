@@ -13,7 +13,7 @@ from typing import Any, get_args, get_origin
 
 import pytest
 
-from pylight import Skylight, TokenAuth
+from pyskylight import Skylight, TokenAuth
 
 # Satisfies every return decoder: `data` as a lone resource still yields a
 # one-item list via Document.data_list, so list- and single-returning methods

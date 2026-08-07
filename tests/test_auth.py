@@ -10,10 +10,10 @@ import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
 
-from pylight.auth import Auth, PasswordAuth, TokenAuth, _csrf_token, _pkce_pair
-from pylight.const import REDIRECT_URI
-from pylight.exceptions import AuthenticationError
-from pylight.models import Token
+from pyskylight.auth import Auth, PasswordAuth, TokenAuth, _csrf_token, _pkce_pair
+from pyskylight.const import REDIRECT_URI
+from pyskylight.exceptions import AuthenticationError
+from pyskylight.models import Token
 
 EMAIL = "me@example.com"
 PASSWORD = "hunter2"

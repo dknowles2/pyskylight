@@ -2,7 +2,7 @@
 
 Example:
     >>> import asyncio
-    >>> from pylight import PasswordAuth, Skylight
+    >>> from pyskylight import PasswordAuth, Skylight
     >>>
     >>> async def main() -> None:
     ...     async with Skylight(PasswordAuth("me@example.com", "hunter2")) as skylight:

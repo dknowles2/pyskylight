@@ -2,8 +2,8 @@
 
 from datetime import date, datetime, timedelta, timezone
 
-from pylight.jsonapi import Document
-from pylight.models import (
+from pyskylight.jsonapi import Document
+from pyskylight.models import (
     Category,
     Chore,
     ChoreGroups,
@@ -212,7 +212,7 @@ def test_user_name_falls_back_to_profile():
 
 
 def test_calendar_event_handles_both_category_relationship_shapes():
-    from pylight.models import CalendarEvent
+    from pyskylight.models import CalendarEvent
 
     singular = CalendarEvent.from_resource(
         {
