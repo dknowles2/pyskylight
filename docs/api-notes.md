@@ -142,9 +142,67 @@ pylight makes all of these required arguments.
 devices 24 (including nightlight and sleep sound), chores 22, calendar events 23.
 All are now modeled.
 
+## Write calls, verified against a test frame
+
+All write endpoints were then exercised against a dedicated throwaway frame —
+34/34 succeed, with every created object deleted afterwards. This overturned the
+biggest assumption carried over from the OpenAPI spec.
+
+**Writes are not JSON:API.** The spec documents `POST /chores` taking
+`{"data": {"type": "chore", "attributes": {...}}}`, and ships a captured example
+of exactly that. The live API ignores it — the wrapper is silently dropped and
+the request fails validation on the (now missing) fields:
+
+```
+POST /lists  {"data": {"type": "list", "attributes": {"label": "x", ...}}}
+422 Label can't be blank; Kind can't be blank; Color can't be blank
+```
+
+Every create and update takes a **flat** body instead: `{"label": "x", "kind":
+"shopping", "color": "#00526D"}`. That holds for categories, chores, task box
+items, lists, list items, calendar events, rewards, nudges, and albums. The
+spec's example is presumably from an older API version.
+
+**Singular vs plural category fields.** `POST /chores` takes `category_id` and
+rejects `category_ids`; `POST /chores/create_multiple` is the reverse and takes
+`category_ids` — that is what "multiple" means, one chore per profile, not a
+batch of different chores. A `{"chores": [...]}` array returns a 500. Rewards,
+nudges, and reward points all take `category_ids`.
+
+**A category is mandatory** for chores, rewards, nudges, and reward points
+(`422 Category is required` / `Category ids is required`).
+
+**Completions.** `PUT /chores/{id}/completions` accepts `status` values
+`"complete"` and `"pending"` — **not** `"completed"`, and not `"skipped"`, both
+of which fail `status is not included in the list`. `instance_date` is required
+for recurring chores and rejected for one-time ones. `category_id` is rejected
+outright (`must be blank`).
+
+**`apply_to` is conditional.** `DELETE /chores/{id}` rejects it on a one-time
+chore with `400 one-time chores should not have a value for apply_to`, and needs
+it for recurring ones. It is optional on update. pylight defaults it to unset.
+
+**Move takes a neighbour, not an index.** Every scalar form of `position` fails
+with `422 Position is required` — including query and form encodings. The real
+shape is an object: `{"position": {"before": <chore_id>}}` or `{"after": ...}`.
+The unhelpful error comes from the object-shape check, which reports
+`position must include at least one of \`before\` or \`after\`` only once
+`position` is a dict.
+
+**Field names.** Albums take `title`, not `name`. Nudges take `body` and
+`deliver_at`, not `summary` and `start` — and they turn out to be spoken
+reminders, with `voice_kind` and `audio_url` fields.
+
+**Create responses vary.** `POST /chores` and most creates return a single
+resource under `data`; `POST /chores/create_multiple` and `POST /rewards` return
+a **list**. pylight returns `list[Chore]` and `list[Reward]` for those two.
+
+**Colors are validated** against the palette from `GET /api/colors`; an
+arbitrary hex is rejected with `Color is invalid`.
+
 ## Known gaps
 
-The verification account had no nudges and no device alarms, so `Nudge` and
-`Alarm` still carry only an id and raw attributes. Write endpoints (POST/PUT/
-PATCH/DELETE) are implemented from the documented shapes but deliberately were
-not exercised.
+Device writes (rename, factory reset, alarms) are untested — the test frame has
+no device attached, and a reset is not something to fire at a real one.
+Account-level writes (`update_user`, `delete_user`, notification toggles) are
+untested too, having no clean undo.

@@ -22,11 +22,11 @@ from .exceptions import (
 from .jsonapi import Document
 from .models import (
     Alarm,
-    ApplyTo,
     CalendarEvent,
     Category,
     Chore,
     ChoreGroups,
+    ChoreStatus,
     Device,
     Frame,
     ListItem,
@@ -63,27 +63,16 @@ def _params(**kwargs: Any) -> dict[str, str]:
     return {k: _fmt(v) for k, v in kwargs.items() if v is not None}
 
 
+def _as_list(value: Sequence[str] | str | None) -> list[str] | None:
+    """Normalize an RRULE argument to the list the API expects."""
+    if value is None:
+        return None
+    return [value] if isinstance(value, str) else list(value)
+
+
 def _body(**kwargs: Any) -> _JSON:
     """Drop ``None`` values from a request body."""
     return {k: v for k, v in kwargs.items() if v is not None}
-
-
-def _resource(
-    resource_type: str,
-    attributes: Mapping[str, Any],
-    relationships: Mapping[str, Any] | None = None,
-) -> _JSON:
-    """Wrap attributes in a JSON:API single-resource request document."""
-    data: _JSON = {"type": resource_type, "attributes": dict(attributes)}
-    if relationships:
-        data["relationships"] = dict(relationships)
-    return {"data": data}
-
-
-def _to_one(resource_type: str, resource_id: str | int | None) -> _JSON | None:
-    if resource_id is None:
-        return None
-    return {"data": {"type": resource_type, "id": str(resource_id)}}
 
 
 class Skylight:
@@ -339,26 +328,35 @@ class Skylight:
         self,
         frame_id: str | int,
         label: str,
-        *,
-        color: str | None = None,
+        color: str,
         **attributes: Any,
     ) -> Category:
-        """Create a family member profile."""
-        payload = _resource("category", _body(label=label, color=color, **attributes))
+        """Create a family member profile.
+
+        Args:
+            frame_id: The frame to create the profile on.
+            label: The profile's display name.
+            color: Hex color, e.g. ``"#00526D"``. Required and validated by the
+                API; :meth:`get_colors` returns the supported palette.
+            **attributes: Any other profile attributes, passed through as-is.
+        """
         return Category.one_from_document(
-            await self.request("POST", f"{API_PREFIX}/frames/{frame_id}/categories", json=payload)
+            await self.request(
+                "POST",
+                f"{API_PREFIX}/frames/{frame_id}/categories",
+                json=_body(label=label, color=color, **attributes),
+            )
         )
 
     async def update_category(
         self, frame_id: str | int, category_id: str | int, **attributes: Any
     ) -> Category:
         """Update a family member profile."""
-        payload = _resource("category", attributes)
         return Category.one_from_document(
             await self.request(
                 "PUT",
                 f"{API_PREFIX}/frames/{frame_id}/categories/{category_id}",
-                json=payload,
+                json=dict(attributes),
             )
         )
 
@@ -418,59 +416,89 @@ class Skylight:
         self,
         frame_id: str | int,
         summary: str,
+        category_id: str | int,
         *,
         start: date | str | None = None,
         start_time: str | None = None,
         status: str | None = None,
         recurring: bool | None = None,
-        recurrence_set: str | None = None,
-        category_id: str | int | None = None,
+        recurrence_set: Sequence[str] | str | None = None,
         **attributes: Any,
     ) -> Chore:
-        """Create a single chore.
+        """Create a chore for one family profile.
 
         Args:
             frame_id: The frame to create the chore on.
             summary: Chore title.
+            category_id: Family profile to assign the chore to. Required — the
+                API rejects a chore with no category (``422 Category is
+                required``). Use :meth:`create_chores` to assign several.
             start: Start date.
             start_time: Time of day, e.g. ``"10:00"``.
             status: Initial status, usually ``"pending"``.
             recurring: Whether the chore repeats.
-            recurrence_set: An RRULE string, e.g.
+            recurrence_set: One or more RRULE strings, e.g.
                 ``"RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=MO;WKST=SU"``.
-            category_id: Family profile to assign the chore to.
             **attributes: Any other chore attributes, passed through as-is.
         """
-        payload = _resource(
-            "chore",
-            _body(
-                summary=summary,
-                start=_fmt(start) if start is not None else None,
-                start_time=start_time,
-                status=status,
-                recurring=recurring,
-                recurrence_set=recurrence_set,
-                **attributes,
-            ),
-            _body(category=_to_one("category", category_id)),
-        )
         return Chore.one_from_document(
-            await self.request("POST", f"{API_PREFIX}/frames/{frame_id}/chores", json=payload)
+            await self.request(
+                "POST",
+                f"{API_PREFIX}/frames/{frame_id}/chores",
+                json=_body(
+                    summary=summary,
+                    category_id=category_id,
+                    start=_fmt(start) if start is not None else None,
+                    start_time=start_time,
+                    status=status,
+                    recurring=recurring,
+                    recurrence_set=_as_list(recurrence_set),
+                    **attributes,
+                ),
+            )
         )
 
     async def create_chores(
-        self, frame_id: str | int, chores: Sequence[Mapping[str, Any]]
-    ) -> _JSON:
-        """Create several chores in one call.
+        self,
+        frame_id: str | int,
+        summary: str,
+        category_ids: Sequence[str | int],
+        *,
+        start: date | str | None = None,
+        start_time: str | None = None,
+        recurring: bool | None = None,
+        recurrence_set: Sequence[str] | str | None = None,
+        **attributes: Any,
+    ) -> list[Chore]:
+        """Create the same chore for several family profiles at once.
 
         Args:
             frame_id: The frame to create the chores on.
-            chores: Chore field mappings, e.g. ``[{"summary": "Dishes", ...}]``.
+            summary: Chore title.
+            category_ids: Family profiles to assign the chore to.
+            start: Start date.
+            start_time: Time of day, e.g. ``"10:00"``.
+            recurring: Whether the chore repeats.
+            recurrence_set: One or more RRULE strings.
+            **attributes: Any other chore attributes, passed through as-is.
+
+        Returns:
+            The created chores — one per profile.
         """
-        return await self.request(
-            "POST",
-            f"{API_PREFIX}/frames/{frame_id}/chores/create_multiple",
-            json={"chores": [dict(c) for c in chores]},
+        return Chore.from_document(
+            await self.request(
+                "POST",
+                f"{API_PREFIX}/frames/{frame_id}/chores/create_multiple",
+                json=_body(
+                    summary=summary,
+                    category_ids=[str(c) for c in category_ids],
+                    start=_fmt(start) if start is not None else None,
+                    start_time=start_time,
+                    recurring=recurring,
+                    recurrence_set=_as_list(recurrence_set),
+                    **attributes,
+                ),
+            )
         )
 
     async def update_chore(
@@ -478,38 +506,73 @@ class Skylight:
         frame_id: str | int,
         chore_id: str | int,
         *,
-        apply_to: str = ApplyTo.THIS,
+        apply_to: str | None = None,
         **fields: Any,
-    ) -> _JSON:
+    ) -> Chore:
         """Update a chore.
 
         Args:
             frame_id: The frame the chore belongs to.
             chore_id: The underlying chore id — :attr:`Chore.chore_id`, not the
                 per-occurrence :attr:`Chore.id`.
-            apply_to: Recurrence scope. See :class:`~pylight.models.ApplyTo`.
+            apply_to: Recurrence scope for a repeating chore. See
+                :class:`~pylight.models.ApplyTo`. Optional.
             **fields: Chore fields to change.
         """
-        return await self.request(
-            "PUT",
-            f"{API_PREFIX}/frames/{frame_id}/chores/{chore_id}",
-            json={**fields, "apply_to": apply_to},
+        return Chore.one_from_document(
+            await self.request(
+                "PUT",
+                f"{API_PREFIX}/frames/{frame_id}/chores/{chore_id}",
+                json=_body(**fields, apply_to=apply_to),
+            )
         )
 
     async def delete_chore(
-        self, frame_id: str | int, chore_id: str | int, *, apply_to: str = ApplyTo.THIS
+        self, frame_id: str | int, chore_id: str | int, *, apply_to: str | None = None
     ) -> None:
-        """Delete a chore, for the given recurrence scope."""
+        """Delete a chore.
+
+        Args:
+            frame_id: The frame the chore belongs to.
+            chore_id: The underlying chore id.
+            apply_to: Recurrence scope, for repeating chores only. See
+                :class:`~pylight.models.ApplyTo`. Must be left unset for
+                one-time chores, which the API rejects with ``400 one-time
+                chores should not have a value for apply_to``.
+        """
         await self.request(
             "DELETE",
             f"{API_PREFIX}/frames/{frame_id}/chores/{chore_id}",
-            json={"apply_to": apply_to},
+            json=_body(apply_to=apply_to) or None,
         )
 
-    async def move_chore(self, frame_id: str | int, chore_id: str | int, **fields: Any) -> _JSON:
-        """Reorder or move a chore."""
+    async def move_chore(
+        self,
+        frame_id: str | int,
+        chore_id: str | int,
+        *,
+        before: str | int | None = None,
+        after: str | int | None = None,
+    ) -> _JSON:
+        """Reorder a chore relative to another one.
+
+        Position is expressed as a neighbour, not an index: pass exactly one of
+        ``before`` or ``after``. The API rejects anything else with
+        ``422 position must include at least one of `before` or `after```.
+
+        Args:
+            frame_id: The frame the chore belongs to.
+            chore_id: The chore to move.
+            before: Place it immediately before this chore id.
+            after: Place it immediately after this chore id.
+        """
+        if (before is None) == (after is None):
+            raise ValueError("pass exactly one of `before` or `after`")
+        position = {"before": str(before)} if before is not None else {"after": str(after)}
         return await self.request(
-            "POST", f"{API_PREFIX}/frames/{frame_id}/chores/{chore_id}/move", json=fields
+            "POST",
+            f"{API_PREFIX}/frames/{frame_id}/chores/{chore_id}/move",
+            json={"position": position},
         )
 
     async def set_chore_status(
@@ -519,44 +582,73 @@ class Skylight:
         status: str,
         *,
         instance_date: date | str | None = None,
-        instance_time: str | None = None,
-        category_id: str | int | None = None,
-        completed_on: datetime | str | None = None,
-    ) -> _JSON:
-        """Mark a chore occurrence complete, incomplete, or skipped.
+        **fields: Any,
+    ) -> Chore:
+        """Mark a chore complete or pending.
+
+        Args:
+            frame_id: The frame the chore belongs to.
+            chore_id: The underlying chore id — :attr:`Chore.chore_id`.
+            status: ``"complete"`` or ``"pending"``. See
+                :class:`~pylight.models.ChoreStatus`; note the API accepts
+                ``"complete"``, not ``"completed"``.
+            instance_date: Which occurrence to act on. Required for recurring
+                chores (``422 instance_date can't be blank``) and rejected for
+                one-time ones (``422 instance_date must be blank``).
+            **fields: Any other completion fields, passed through as-is. Note
+                the API rejects ``category_id`` here.
+        """
+        return Chore.one_from_document(
+            await self.request(
+                "PUT",
+                f"{API_PREFIX}/frames/{frame_id}/chores/{chore_id}/completions",
+                json=_body(
+                    status=status,
+                    instance_date=_fmt(instance_date) if instance_date is not None else None,
+                    **fields,
+                ),
+            )
+        )
+
+    async def complete_chore(
+        self,
+        frame_id: str | int,
+        chore_id: str | int,
+        *,
+        instance_date: date | str | None = None,
+        **fields: Any,
+    ) -> Chore:
+        """Mark a chore complete.
 
         Args:
             frame_id: The frame the chore belongs to.
             chore_id: The underlying chore id.
-            status: See :class:`~pylight.models.ChoreStatus`.
-            instance_date: Which occurrence, for recurring chores.
-            instance_time: Occurrence time of day, if the chore has one.
-            category_id: Which family profile completed it.
-            completed_on: Completion timestamp.
+            instance_date: Required for recurring chores, rejected for one-time.
+            **fields: Any other completion fields.
         """
-        return await self.request(
-            "PUT",
-            f"{API_PREFIX}/frames/{frame_id}/chores/{chore_id}/completions",
-            json=_body(
-                status=status,
-                instance_date=_fmt(instance_date) if instance_date is not None else None,
-                instance_time=instance_time,
-                category_id=str(category_id) if category_id is not None else None,
-                completed_on=_fmt(completed_on) if completed_on is not None else None,
-            ),
+        return await self.set_chore_status(
+            frame_id, chore_id, ChoreStatus.COMPLETE, instance_date=instance_date, **fields
         )
 
-    async def complete_chore(
-        self, frame_id: str | int, chore_id: str | int, **kwargs: Any
-    ) -> _JSON:
-        """Mark a chore occurrence complete."""
-        return await self.set_chore_status(frame_id, chore_id, "completed", **kwargs)
-
     async def uncomplete_chore(
-        self, frame_id: str | int, chore_id: str | int, **kwargs: Any
-    ) -> _JSON:
-        """Mark a chore occurrence pending again."""
-        return await self.set_chore_status(frame_id, chore_id, "pending", **kwargs)
+        self,
+        frame_id: str | int,
+        chore_id: str | int,
+        *,
+        instance_date: date | str | None = None,
+        **fields: Any,
+    ) -> Chore:
+        """Mark a chore pending again.
+
+        Args:
+            frame_id: The frame the chore belongs to.
+            chore_id: The underlying chore id.
+            instance_date: Required for recurring chores, rejected for one-time.
+            **fields: Any other completion fields.
+        """
+        return await self.set_chore_status(
+            frame_id, chore_id, ChoreStatus.PENDING, instance_date=instance_date, **fields
+        )
 
     # --------------------------------------------------------------- task box
 
@@ -577,19 +669,17 @@ class Skylight:
         **attributes: Any,
     ) -> TaskBoxItem:
         """Add an item to the task box."""
-        payload = _resource(
-            "task_box_item",
-            _body(
-                summary=summary,
-                emoji_icon=emoji_icon,
-                routine=routine,
-                reward_points=reward_points,
-                **attributes,
-            ),
-        )
         return TaskBoxItem.one_from_document(
             await self.request(
-                "POST", f"{API_PREFIX}/frames/{frame_id}/task_box/items", json=payload
+                "POST",
+                f"{API_PREFIX}/frames/{frame_id}/task_box/items",
+                json=_body(
+                    summary=summary,
+                    emoji_icon=emoji_icon,
+                    routine=routine,
+                    reward_points=reward_points,
+                    **attributes,
+                ),
             )
         )
 
@@ -601,7 +691,7 @@ class Skylight:
             await self.request(
                 "PATCH",
                 f"{API_PREFIX}/frames/{frame_id}/task_box/items/{item_id}",
-                json=_resource("task_box_item", attributes),
+                json=dict(attributes),
             )
         )
 
@@ -646,9 +736,8 @@ class Skylight:
         self,
         frame_id: str | int,
         label: str,
-        *,
-        kind: str | None = None,
-        color: str | None = None,
+        kind: str,
+        color: str,
         **attributes: Any,
     ) -> SkylightList:
         """Create a list.
@@ -657,13 +746,17 @@ class Skylight:
             frame_id: The frame to create the list on.
             label: List name.
             kind: ``"shopping"`` or ``"to_do"``. See
-                :class:`~pylight.models.ListKind`.
-            color: Hex color, e.g. ``"#A6A6BE"``.
+                :class:`~pylight.models.ListKind`. Required by the API.
+            color: Hex color, e.g. ``"#00526D"``. Required and validated;
+                :meth:`get_colors` returns the supported palette.
             **attributes: Any other list attributes, passed through as-is.
         """
-        payload = _resource("list", _body(label=label, kind=kind, color=color, **attributes))
         return SkylightList.one_from_document(
-            await self.request("POST", f"{API_PREFIX}/frames/{frame_id}/lists", json=payload)
+            await self.request(
+                "POST",
+                f"{API_PREFIX}/frames/{frame_id}/lists",
+                json=_body(label=label, kind=kind, color=color, **attributes),
+            )
         )
 
     async def update_list(
@@ -674,7 +767,7 @@ class Skylight:
             await self.request(
                 "PUT",
                 f"{API_PREFIX}/frames/{frame_id}/lists/{list_id}",
-                json=_resource("list", attributes),
+                json=dict(attributes),
             )
         )
 
@@ -698,12 +791,11 @@ class Skylight:
         **attributes: Any,
     ) -> ListItem:
         """Add an item to a list."""
-        payload = _resource("list_item", _body(label=label, section=section, **attributes))
         return ListItem.one_from_document(
             await self.request(
                 "POST",
                 f"{API_PREFIX}/frames/{frame_id}/lists/{list_id}/list_items",
-                json=payload,
+                json=_body(label=label, section=section, **attributes),
             )
         )
 
@@ -719,7 +811,7 @@ class Skylight:
             await self.request(
                 "PUT",
                 f"{API_PREFIX}/frames/{frame_id}/lists/{list_id}/list_items/{item_id}",
-                json=_resource("list_item", attributes),
+                json=dict(attributes),
             )
         )
 
@@ -819,7 +911,7 @@ class Skylight:
             await self.request(
                 "POST",
                 f"{API_PREFIX}/frames/{frame_id}/calendar_events",
-                json=_resource("calendar_event", fields),
+                json=dict(fields),
             )
         )
 
@@ -831,7 +923,7 @@ class Skylight:
             await self.request(
                 "PUT",
                 f"{API_PREFIX}/frames/{frame_id}/calendar_events/{event_id}",
-                json=_resource("calendar_event", fields),
+                json=dict(fields),
             )
         )
 
@@ -883,7 +975,7 @@ class Skylight:
             await self.request(
                 "PUT",
                 f"{API_PREFIX}/frames/{frame_id}/source_calendars/{calendar_id}",
-                json=_resource("source_calendar", fields),
+                json=dict(fields),
             )
         )
 
@@ -995,9 +1087,39 @@ class Skylight:
             await self._get(f"{API_PREFIX}/frames/{frame_id}/rewards/{reward_id}")
         )
 
-    async def create_rewards(self, frame_id: str | int, **fields: Any) -> _JSON:
-        """Create one or more rewards."""
-        return await self.request("POST", f"{API_PREFIX}/frames/{frame_id}/rewards", json=fields)
+    async def create_rewards(
+        self,
+        frame_id: str | int,
+        name: str,
+        point_value: int,
+        category_ids: Sequence[str | int],
+        **fields: Any,
+    ) -> list[Reward]:
+        """Create a reward for one or more family profiles.
+
+        Args:
+            frame_id: The frame to create the reward on.
+            name: Reward name.
+            point_value: Points needed to redeem it.
+            category_ids: Profiles the reward applies to. Required — the API
+                rejects a missing list with ``422 Category ids is required``.
+            **fields: Any other reward fields, passed through as-is.
+
+        Returns:
+            The created rewards — one per profile.
+        """
+        return Reward.from_document(
+            await self.request(
+                "POST",
+                f"{API_PREFIX}/frames/{frame_id}/rewards",
+                json=_body(
+                    name=name,
+                    point_value=point_value,
+                    category_ids=[str(c) for c in category_ids],
+                    **fields,
+                ),
+            )
+        )
 
     async def update_reward(
         self, frame_id: str | int, reward_id: str | int, **fields: Any
@@ -1036,10 +1158,22 @@ class Skylight:
             await self._get(f"{API_PREFIX}/frames/{frame_id}/reward_points")
         )
 
-    async def update_reward_points(self, frame_id: str | int, **fields: Any) -> _JSON:
-        """Award or adjust reward points."""
+    async def update_reward_points(
+        self, frame_id: str | int, category_ids: Sequence[str | int], points: int, **fields: Any
+    ) -> _JSON:
+        """Award or adjust reward points for one or more profiles.
+
+        Args:
+            frame_id: The frame to update.
+            category_ids: Profiles to credit. Required — the API rejects a
+                missing list with ``422 Category ids is required``.
+            points: Points to add. Negative values subtract.
+            **fields: Any other fields, passed through as-is.
+        """
         return await self.request(
-            "POST", f"{API_PREFIX}/frames/{frame_id}/reward_points", json=fields
+            "POST",
+            f"{API_PREFIX}/frames/{frame_id}/reward_points",
+            json=_body(category_ids=[str(c) for c in category_ids], points=points, **fields),
         )
 
     # ----------------------------------------------------------------- nudges
@@ -1059,9 +1193,37 @@ class Skylight:
             await self._get(f"{API_PREFIX}/frames/{frame_id}/nudges", after=after, before=before)
         )
 
-    async def create_nudge(self, frame_id: str | int, **fields: Any) -> _JSON:
-        """Create a nudge."""
-        return await self.request("POST", f"{API_PREFIX}/frames/{frame_id}/nudges", json=fields)
+    async def create_nudge(
+        self,
+        frame_id: str | int,
+        body: str,
+        deliver_at: datetime | str,
+        category_ids: Sequence[str | int],
+        **fields: Any,
+    ) -> Nudge:
+        """Create a nudge — a spoken reminder played on the frame.
+
+        Args:
+            frame_id: The frame to create the nudge on.
+            body: What the nudge says. Required (``422 Body can't be blank``).
+            deliver_at: When to play it. Required (``422 Deliver at can't be
+                blank``).
+            category_ids: Profiles the nudge is for. Required.
+            **fields: Any other nudge fields — ``recurring``, ``rrule``,
+                ``recurring_until``, ``voice_kind``, ``audio_url``.
+        """
+        return Nudge.one_from_document(
+            await self.request(
+                "POST",
+                f"{API_PREFIX}/frames/{frame_id}/nudges",
+                json=_body(
+                    body=body,
+                    deliver_at=_fmt(deliver_at),
+                    category_ids=[str(c) for c in category_ids],
+                    **fields,
+                ),
+            )
+        )
 
     async def update_nudge(self, frame_id: str | int, nudge_id: str | int, **fields: Any) -> _JSON:
         """Update a nudge."""
@@ -1101,9 +1263,17 @@ class Skylight:
         """List albums."""
         return await self._get(f"{API_PREFIX}/frames/{frame_id}/albums")
 
-    async def create_album(self, frame_id: str | int, **fields: Any) -> _JSON:
-        """Create an album."""
-        return await self.request("POST", f"{API_PREFIX}/frames/{frame_id}/albums", json=fields)
+    async def create_album(self, frame_id: str | int, title: str, **fields: Any) -> _JSON:
+        """Create an album.
+
+        Args:
+            frame_id: The frame to create the album on.
+            title: Album title. The field is ``title``, not ``name``.
+            **fields: Any other album fields, passed through as-is.
+        """
+        return await self.request(
+            "POST", f"{API_PREFIX}/frames/{frame_id}/albums", json=_body(title=title, **fields)
+        )
 
     async def delete_album(self, frame_id: str | int, album_id: str | int) -> None:
         """Delete an album."""
