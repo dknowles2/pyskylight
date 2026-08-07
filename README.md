@@ -107,12 +107,12 @@ deleting, or completing.
 A few endpoints don't follow the usual shapes, and pylight normalizes them:
 
 ```python
-groups = await skylight.get_all_chores(frame_id)   # ChoreGroups, bucketed
+groups = await skylight.get_all_chores(frame_id)  # ChoreGroups, bucketed
 groups.chores["late"], groups.chores["today"], groups.routines["today_timed"]
-groups.all                                          # flattened
+groups.all  # flattened
 
-balances = await skylight.get_reward_points(frame_id)   # plain array upstream
-frames = await skylight.get_calendar_frames()           # a list, despite the path
+balances = await skylight.get_reward_points(frame_id)  # plain array upstream
+frames = await skylight.get_calendar_frames()  # a list, despite the path
 ```
 
 Some endpoints reject requests that omit an optional-looking parameter, so pylight makes
