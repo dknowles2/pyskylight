@@ -1,0 +1,60 @@
+# Run `uv run pre-commit install` once to enable these on every commit.
+# Everything here also runs in CI, so a bypassed hook still gets caught.
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+      - id: debug-statements
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.2
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.9.9
+    hooks:
+      # Keeps uv.lock in step with pyproject.toml, so CI's frozen sync can't
+      # fail on a dependency change that was never locked.
+      - id: uv-lock
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run mypy pylight
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: pytest
+        name: pytest
+        entry: uv run pytest -q
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: no-credentials
+        name: no skylight credentials
+        # Development reads real credentials from ~/.skylight; make sure a copy
+        # of that file, a session cookie, or a live token never lands in a
+        # commit. Anchored so `self._password = password` is not a match.
+        entry: |
+          (?x)
+          ^\s*(?:username|password)\s*=\s*[^\s"'\#] |
+          skylightcloud_session= |
+          Bearer\s+[A-Za-z0-9._~+/-]{20,}
+        language: pygrep
+        exclude: '^\.pre-commit-config\.yaml$'

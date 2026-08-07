@@ -1,5 +1,8 @@
 """Tests for the Skylight client's request handling and endpoint wiring."""
 
+from datetime import datetime, timezone
+
+import aiohttp
 import pytest
 
 from pylight import (
@@ -12,7 +15,7 @@ from pylight import (
 )
 from pylight.auth import Auth
 from pylight.const import API_VERSION, USER_AGENT
-from pylight.exceptions import AuthenticationError
+from pylight.exceptions import AuthenticationError, SkylightError
 
 FRAME = "5455113"
 
@@ -285,3 +288,59 @@ async def test_supplied_session_is_not_closed(api):
             api.queue({"data": []})
             await client.get_frames()
         assert not session.closed
+
+
+# --- request plumbing --------------------------------------------------------
+
+
+async def test_datetime_and_sequence_query_params(client, api):
+    api.queue({"data": []})
+    await client.get_rewards(
+        FRAME, redeemed_at_min=datetime(2026, 8, 7, 12, 0, tzinfo=timezone.utc)
+    )
+    assert api.last.query == {"redeemed_at_min": "2026-08-07T12:00:00+00:00"}
+
+
+async def test_closed_supplied_session_is_reported(api):
+    session = aiohttp.ClientSession()
+    await session.close()
+    client = Skylight(TokenAuth("t"), session=session, base_url=api.url)
+    with pytest.raises(SkylightError, match="closed"):
+        await client.get_colors()
+
+
+async def test_empty_and_non_json_bodies(client, api):
+    api.queue(None, status=200)
+    assert await client.get_household_config(FRAME) is None
+
+    api.queue_raw("<html>not json</html>", status=200, content_type="text/html")
+    assert await client.get_household_config(FRAME) is None
+
+
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ({"errors": ["first", "second"]}, "first; second"),
+        ({"errors": [{"detail": "detailed"}]}, "detailed"),
+        ({"errors": [{"title": "titled"}]}, "titled"),
+        ({"error_description": "described"}, "described"),
+        ({"error": "short"}, "short"),
+        ({"message": "messaged"}, "messaged"),
+        ({"errors": {"status": ["is not included in the list"]}}, None),
+    ],
+)
+async def test_error_message_extraction(client, api, body, expected):
+    api.queue(body, status=422)
+    with pytest.raises(ApiError) as excinfo:
+        await client.get_user()
+    if expected is not None:
+        assert expected in str(excinfo.value)
+    assert excinfo.value.status == 422
+    assert excinfo.value.url.endswith("/api/user")
+
+
+async def test_non_dict_error_body(client, api):
+    api.queue(["unexpected"], status=500)
+    with pytest.raises(ApiError) as excinfo:
+        await client.get_user()
+    assert excinfo.value.errors == []

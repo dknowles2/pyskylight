@@ -10,6 +10,14 @@ from aiohttp.test_utils import TestServer
 
 
 @dataclass
+class _Raw:
+    """A response body that is not JSON."""
+
+    text: str
+    content_type: str
+
+
+@dataclass
 class RecordedRequest:
     method: str
     path: str
@@ -28,6 +36,10 @@ class FakeApi:
 
     def queue(self, payload: Any = None, status: int = 200) -> None:
         self.responses.append((status, payload))
+
+    def queue_raw(self, text: str, status: int = 200, content_type: str = "text/plain") -> None:
+        """Queue a non-JSON response body."""
+        self.responses.append((status, _Raw(text, content_type)))
 
     @property
     def last(self) -> RecordedRequest:
@@ -52,6 +64,8 @@ class FakeApi:
         status, payload = self.responses.popleft() if self.responses else (200, {})
         if payload is None:
             return web.Response(status=status)
+        if isinstance(payload, _Raw):
+            return web.Response(text=payload.text, status=status, content_type=payload.content_type)
         return web.json_response(payload, status=status)
 
 

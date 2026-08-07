@@ -184,8 +184,19 @@ Dev tools live in the `dev` [dependency group](https://peps.python.org/pep-0735/
 committed and CI runs `--frozen`, so a new upstream release can't turn a green branch red
 on its own; run `uv lock --upgrade` to pick up newer versions deliberately.
 
+Enable the git hooks (ruff, mypy, pytest, lockfile freshness, and a guard against
+committing credentials) once:
+
+```bash
+uv run pre-commit install
+```
+
 Test against another interpreter with `uv run --python 3.10 pytest`, and build with
 `uv build`.
+
+CI runs the suite on 3.10–3.13 with branch coverage (floor: 97%), the linters, the
+pre-commit hooks, a build with `twine check`, and a job that installs the declared
+dependency floor (`aiohttp==3.9.0`) to check that claim is true.
 
 ## Sources
 
