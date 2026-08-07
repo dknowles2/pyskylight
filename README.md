@@ -10,6 +10,10 @@ chores, lists, rewards, and frames.
 ## Install
 
 ```bash
+uv add pylight
+```
+
+```bash
 pip install pylight
 ```
 
@@ -160,11 +164,28 @@ All derive from `SkylightError`. `304 Not Modified` and `204 No Content` return 
 
 ## Development
 
+This project uses [uv](https://docs.astral.sh/uv/). One command sets up a virtualenv
+with the locked dependency versions:
+
 ```bash
-uv venv && uv pip install -e ".[dev]"
-uv run pytest
-uv run ruff check . && uv run mypy pylight
+uv sync
 ```
+
+```bash
+uv run pytest
+```
+
+```bash
+uv run ruff check . && uv run ruff format --check . && uv run mypy pylight
+```
+
+Dev tools live in the `dev` [dependency group](https://peps.python.org/pep-0735/), which
+`uv sync` installs by default and which stays out of the published wheel. `uv.lock` is
+committed and CI runs `--frozen`, so a new upstream release can't turn a green branch red
+on its own; run `uv lock --upgrade` to pick up newer versions deliberately.
+
+Test against another interpreter with `uv run --python 3.10 pytest`, and build with
+`uv build`.
 
 ## Sources
 
