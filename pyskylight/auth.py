@@ -306,7 +306,7 @@ class PasswordAuth(Auth):
         """Walk redirects by hand, stopping at the OAuth redirect URI.
 
         Returns ``(body, final_url, code)``. ``code`` is set only when the chain
-        reached :data:`~pylight.const.REDIRECT_URI`, which is never fetched: the
+        reached :data:`~pyskylight.const.REDIRECT_URI`, which is never fetched: the
         authorization code is read straight out of the ``Location`` header.
         """
         for _ in range(max_redirects):

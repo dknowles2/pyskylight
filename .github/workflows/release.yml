@@ -1,0 +1,82 @@
+name: Release
+
+# Publishes to PyPI when a GitHub release is published, using Trusted
+# Publishing: PyPI verifies this workflow's OIDC identity, so there is no API
+# token to store or leak. Configure the publisher once at
+# https://pypi.org/manage/account/publishing/ with:
+#   owner: dknowles2   repository: pyskylight
+#   workflow: release.yml   environment: pypi
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Where to publish
+        required: true
+        default: testpypi
+        type: choice
+        options: [testpypi, pypi]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Check the tag matches the packaged version
+        # A release tagged v0.2.0 that ships 0.1.0 is worse than a failed build.
+        if: github.event_name == 'release'
+        run: |
+          packaged=$(uv run --frozen python -c \
+            "import importlib.metadata as m; print(m.version('pyskylight'))")
+          tagged="${GITHUB_REF_NAME#v}"
+          echo "tag=$tagged packaged=$packaged"
+          test "$packaged" = "$tagged"
+
+      - run: uv build
+      - run: uvx twine check --strict dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  testpypi:
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/pyskylight
+    permissions:
+      id-token: write # required for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+  pypi:
+    needs: build
+    if: github.event_name == 'release' || inputs.target == 'pypi'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/pyskylight
+    permissions:
+      id-token: write # required for Trusted Publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

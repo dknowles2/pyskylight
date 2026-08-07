@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import aiohttp
 import pytest
 
-from pylight import (
+from pyskylight import (
     ApiError,
     NotAuthorizedError,
     NotFoundError,
@@ -13,9 +13,9 @@ from pylight import (
     Skylight,
     TokenAuth,
 )
-from pylight.auth import Auth
-from pylight.const import API_VERSION, USER_AGENT
-from pylight.exceptions import AuthenticationError, SkylightError
+from pyskylight.auth import Auth
+from pyskylight.const import API_VERSION, USER_AGENT
+from pyskylight.exceptions import AuthenticationError, SkylightError
 
 FRAME = "5455113"
 

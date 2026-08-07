@@ -1,4 +1,4 @@
-"""Exceptions raised by pylight."""
+"""Exceptions raised by pyskylight."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ __all__ = [
 
 
 class SkylightError(Exception):
-    """Base class for all errors raised by pylight."""
+    """Base class for all errors raised by pyskylight."""
 
 
 class AuthenticationError(SkylightError):

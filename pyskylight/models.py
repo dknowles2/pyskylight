@@ -3,7 +3,7 @@
 Field coverage comes from live captures against a real account, cross-checked
 against the reverse-engineered OpenAPI spec. Because the API sends
 ``additionalProperties`` freely, every model also keeps its raw resource: reach
-anything unmodeled via :attr:`~pylight.jsonapi.ApiObject.attributes`.
+anything unmodeled via :attr:`~pyskylight.jsonapi.ApiObject.attributes`.
 """
 
 from __future__ import annotations

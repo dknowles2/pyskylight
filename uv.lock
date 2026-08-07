@@ -1121,7 +1121,7 @@ wheels = [
 ]
 
 [[package]]
-name = "pylight"
+name = "pyskylight"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

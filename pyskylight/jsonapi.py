@@ -35,11 +35,11 @@ __all__ = [
 ]
 
 #: ``field(metadata=...)`` key: read this attribute name instead of the field name.
-ALIAS = "pylight.alias"
+ALIAS = "pyskylight.alias"
 #: ``field(metadata=...)`` key: read the id of a to-one relationship.
-RELATIONSHIP = "pylight.relationship"
+RELATIONSHIP = "pyskylight.relationship"
 #: ``field(metadata=...)`` key: read the ids of a to-many relationship.
-RELATIONSHIPS = "pylight.relationships"
+RELATIONSHIPS = "pyskylight.relationships"
 
 T = TypeVar("T", bound="ApiObject")
 

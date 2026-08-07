@@ -67,7 +67,7 @@ jobs:
       - run: uv sync
       - run: uv run ruff check --output-format=github .
       - run: uv run ruff format --check .
-      - run: uv run mypy pylight
+      - run: uv run mypy pyskylight
 
   pre-commit:
     # Catches anything a contributor committed with --no-verify.

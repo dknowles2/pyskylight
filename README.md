@@ -1,4 +1,4 @@
-# pylight
+# pyskylight
 
 An async Python client for the [Skylight](https://www.skylight.com/) API — calendars,
 chores, lists, rewards, and frames.
@@ -10,11 +10,11 @@ chores, lists, rewards, and frames.
 ## Install
 
 ```bash
-uv add pylight
+uv add pyskylight
 ```
 
 ```bash
-pip install pylight
+pip install pyskylight
 ```
 
 ## Quick start
@@ -22,7 +22,7 @@ pip install pylight
 ```python
 import asyncio
 
-from pylight import PasswordAuth, Skylight
+from pyskylight import PasswordAuth, Skylight
 
 
 async def main() -> None:
@@ -60,13 +60,13 @@ refreshes the access token before it expires:
 4. `POST /oauth/token` exchanges the code plus the PKCE `code_verifier` for an
    access token and a refresh token.
 
-pylight never follows the final redirect — it reads the authorization code out of the
+pyskylight never follows the final redirect — it reads the authorization code out of the
 `Location` header — and the Rails session cookie is confined to a private cookie jar.
 
 If you already captured a token, skip the flow:
 
 ```python
-from pylight import Skylight, TokenAuth
+from pyskylight import Skylight, TokenAuth
 
 skylight = Skylight(TokenAuth("<access token>"))
 ```
@@ -108,7 +108,7 @@ Recurring chores are returned one resource per occurrence. `Chore.id` is the occ
 id (`"<chore_id>-<date>"`); pass `Chore.chore_id` — the `group` attribute — when updating,
 deleting, or completing.
 
-A few endpoints don't follow the usual shapes, and pylight normalizes them:
+A few endpoints don't follow the usual shapes, and pyskylight normalizes them:
 
 ```python
 groups = await skylight.get_all_chores(frame_id)  # ChoreGroups, bucketed
@@ -119,7 +119,7 @@ balances = await skylight.get_reward_points(frame_id)  # plain array upstream
 frames = await skylight.get_calendar_frames()  # a list, despite the path
 ```
 
-Some endpoints reject requests that omit an optional-looking parameter, so pylight makes
+Some endpoints reject requests that omit an optional-looking parameter, so pyskylight makes
 those required: `get_countdowns(frame_id, timezone)`, `get_nudges(frame_id, after, before)`,
 `get_meal_sittings(frame_id, date_min, date_max)`.
 
@@ -134,7 +134,7 @@ it is verified against a live test frame and written up in
 The upstream schema is observed, not specified, so every model keeps its raw resource:
 
 ```python
-chore.attributes["some_field_pylight_does_not_know_about"]
+chore.attributes["a_field_pyskylight_does_not_know_about"]
 ```
 
 Fully typed models, all verified against live responses: `Frame`, `Category`, `Chore`,
@@ -176,7 +176,7 @@ uv run pytest
 ```
 
 ```bash
-uv run ruff check . && uv run ruff format --check . && uv run mypy pylight
+uv run ruff check . && uv run ruff format --check . && uv run mypy pyskylight
 ```
 
 Dev tools live in the `dev` [dependency group](https://peps.python.org/pep-0735/), which
@@ -198,10 +198,20 @@ CI runs the suite on 3.10–3.13 with branch coverage (floor: 97%), the linters,
 pre-commit hooks, a build with `twine check`, and a job that installs the declared
 dependency floor (`aiohttp==3.9.0`) to check that claim is true.
 
+## Releasing
+
+Publishing runs from CI via [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/),
+so no API token is stored in the repository. One-time setup on PyPI (Account → Publishing):
+owner `dknowles2`, repository `pyskylight`, workflow `release.yml`, environment `pypi`.
+
+To cut a release, bump `version` in `pyproject.toml`, then publish a GitHub release tagged
+`vX.Y.Z`. The workflow refuses to publish if the tag and the packaged version disagree.
+`workflow_dispatch` publishes to TestPyPI for a dry run.
+
 ## Sources
 
 The endpoint surface comes from two reverse-engineering efforts; see
-[docs/api-notes.md](docs/api-notes.md) for how they differ and which one pylight
+[docs/api-notes.md](docs/api-notes.md) for how they differ and which one pyskylight
 follows where they disagree.
 
 ## License

@@ -79,8 +79,8 @@ class Skylight:
     """An async Skylight API client.
 
     Args:
-        auth: Supplies the bearer token. See :class:`~pylight.auth.PasswordAuth`
-            and :class:`~pylight.auth.TokenAuth`.
+        auth: Supplies the bearer token. See :class:`~pyskylight.auth.PasswordAuth`
+            and :class:`~pyskylight.auth.TokenAuth`.
         session: An existing :class:`aiohttp.ClientSession` to use. When omitted,
             the client creates and owns one.
         base_url: Override the API host. Useful for tests.
@@ -400,7 +400,7 @@ class Skylight:
         This endpoint does not return a JSON:API document: chores arrive grouped
         under ``late``, ``today``, ``today_timed``, ``any_day``, and ``future``,
         with routines in a parallel structure. See
-        :class:`~pylight.models.ChoreGroups`.
+        :class:`~pyskylight.models.ChoreGroups`.
         """
         return ChoreGroups.from_response(
             await self._get(f"{API_PREFIX}/frames/{frame_id}/chores/all", **params)
@@ -516,7 +516,7 @@ class Skylight:
             chore_id: The underlying chore id — :attr:`Chore.chore_id`, not the
                 per-occurrence :attr:`Chore.id`.
             apply_to: Recurrence scope for a repeating chore. See
-                :class:`~pylight.models.ApplyTo`. Optional.
+                :class:`~pyskylight.models.ApplyTo`. Optional.
             **fields: Chore fields to change.
         """
         return Chore.one_from_document(
@@ -536,7 +536,7 @@ class Skylight:
             frame_id: The frame the chore belongs to.
             chore_id: The underlying chore id.
             apply_to: Recurrence scope, for repeating chores only. See
-                :class:`~pylight.models.ApplyTo`. Must be left unset for
+                :class:`~pyskylight.models.ApplyTo`. Must be left unset for
                 one-time chores, which the API rejects with ``400 one-time
                 chores should not have a value for apply_to``.
         """
@@ -590,7 +590,7 @@ class Skylight:
             frame_id: The frame the chore belongs to.
             chore_id: The underlying chore id — :attr:`Chore.chore_id`.
             status: ``"complete"`` or ``"pending"``. See
-                :class:`~pylight.models.ChoreStatus`; note the API accepts
+                :class:`~pyskylight.models.ChoreStatus`; note the API accepts
                 ``"complete"``, not ``"completed"``.
             instance_date: Which occurrence to act on. Required for recurring
                 chores (``422 instance_date can't be blank``) and rejected for
@@ -746,7 +746,7 @@ class Skylight:
             frame_id: The frame to create the list on.
             label: List name.
             kind: ``"shopping"`` or ``"to_do"``. See
-                :class:`~pylight.models.ListKind`. Required by the API.
+                :class:`~pyskylight.models.ListKind`. Required by the API.
             color: Hex color, e.g. ``"#00526D"``. Required and validated;
                 :meth:`get_colors` returns the supported palette.
             **attributes: Any other list attributes, passed through as-is.
@@ -824,7 +824,7 @@ class Skylight:
             frame_id: The frame the list belongs to.
             list_id: The list the item belongs to.
             item_id: The item to update.
-            status: See :class:`~pylight.models.ListItemStatus`.
+            status: See :class:`~pyskylight.models.ListItemStatus`.
         """
         return await self.update_list_item(frame_id, list_id, item_id, status=status)
 
