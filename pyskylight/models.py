@@ -126,6 +126,13 @@ class Chore(ApiObject):
     Recurring chores are returned one resource per occurrence, and :attr:`id` is
     an occurrence id of the form ``"<chore_id>-<date>"``. :attr:`chore_id` is the
     addressable chore — pass it to update, delete, and completion calls.
+
+    A chore with :attr:`up_for_grabs` set has no :attr:`category_id`: nobody owns
+    it until somebody claims it. The Skylight app shows these under "Up for
+    Grabs". They are returned only by
+    :meth:`~pyskylight.client.Skylight.get_all_chores`, never by
+    :meth:`~pyskylight.client.Skylight.get_chores`, and completing one requires
+    naming the profile that did it.
     """
 
     chore_id: str | None = field(default=None, metadata=alias("group"))
@@ -154,6 +161,11 @@ class Chore(ApiObject):
     completed_category_id: str | None = field(
         default=None, metadata=relationship("completed_category")
     )
+
+    @property
+    def unassigned(self) -> bool:
+        """Whether this chore is up for grabs — flagged, and owned by nobody."""
+        return bool(self.up_for_grabs) and self.category_id is None
 
     @property
     def completed(self) -> bool:

@@ -73,6 +73,35 @@ def test_chore_decoding():
     assert chore.attributes["unmodeled_field"] == "kept in .attributes"
 
 
+def test_unassigned_chore():
+    """An "Up for Grabs" chore is flagged and owned by nobody."""
+    up_for_grabs = Chore.from_resource(
+        {
+            "type": "chore",
+            "id": "9002",
+            "attributes": {"summary": "Vacuum", "up_for_grabs": True},
+            "relationships": {"category": {"data": None}},
+        }
+    )
+    assert up_for_grabs.unassigned is True
+    assert up_for_grabs.category_id is None
+
+    # The flag alone is not enough: the API ignores it unless the category goes
+    # too, so a chore can carry it while still belonging to someone.
+    still_owned = Chore.from_resource(
+        {
+            "type": "chore",
+            "id": "9003",
+            "attributes": {"summary": "Vacuum", "up_for_grabs": True},
+            "relationships": {"category": {"data": {"type": "category", "id": "77"}}},
+        }
+    )
+    assert still_owned.unassigned is False
+
+    (ordinary,) = Chore.from_document(CHORES_DOC)
+    assert ordinary.unassigned is False
+
+
 def test_completed_chore():
     doc = {
         "data": {

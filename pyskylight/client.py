@@ -608,8 +608,17 @@ class Skylight:
             instance_date: Which occurrence to act on. Required for recurring
                 chores (``422 instance_date can't be blank``) and rejected for
                 one-time ones (``422 instance_date must be blank``).
-            **fields: Any other completion fields, passed through as-is. Note
-                the API rejects ``category_id`` here.
+            **fields: Any other completion fields, passed through as-is.
+
+        Note:
+            Whether ``category_id`` belongs here depends on the chore, and
+            getting it wrong is a 422 either way:
+
+            * An **assigned** chore rejects it. The completion is credited to
+              the chore's own category automatically.
+            * An **up-for-grabs** chore requires it — that is how the API
+              records who claimed the chore, since it belongs to nobody. See
+              :attr:`~pyskylight.models.Chore.up_for_grabs`.
         """
         return Chore.one_from_document(
             await self.request(

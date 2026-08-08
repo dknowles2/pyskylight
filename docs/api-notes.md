@@ -118,6 +118,35 @@ single frame — the resource type is `approved_viewer_frame`. Hence
 `today_timed`, `any_day`, and `future`, each bucket its own `{data, included}`
 document. Modeled as `ChoreGroups`.
 
+**"Up for Grabs" chores are only in `/chores/all`.** A chore with
+`up_for_grabs: true` has no category — nobody owns it until somebody claims it.
+`GET /chores` never returns one, in any window: querying today, today plus late,
+and a full week all came back with zero uncategorized chores while
+`/chores/all` held eight. `up_for_grabs` and `filter` are both rejected as query
+parameters there (`422`), so there is no way to ask for them. Use
+`get_all_chores()`, and `Chore.unassigned` to pick them out.
+
+**Making a chore up for grabs takes two fields at once.** `PUT
+/api/frames/{id}/chores/{id}` with `{"up_for_grabs": true}` returns `200` and
+changes nothing; `{"up_for_grabs": true, "category_id": null}` works. Creating
+one directly is not possible — `POST /chores` answers `422 Category is
+required.` whether or not `up_for_grabs` is set, with or without an explicit
+null category.
+
+**Completing a chore: whether `category_id` belongs in the body depends on the
+chore.** Verified on a test frame, both directions:
+
+| Chore | `category_id` sent | Result |
+| --- | --- | --- |
+| Assigned | yes | `422` |
+| Assigned | no | `200`, `completed_category` set to the chore's own category |
+| Up for grabs | yes | `200`, `completed_category` set to that category |
+| Up for grabs | no | `422` |
+
+So an up-for-grabs chore cannot be completed anonymously: the API insists on
+knowing who claimed it. `completed_category_id`, `completed_category`, and
+`completed_by` are all rejected — `category_id` is the name.
+
 **`/reward_points` is a plain JSON array** of
 `{category_id, current_point_balance, lifetime_points_earned}` — no JSON:API
 envelope, so `RewardPoint` is not an `ApiObject`.
