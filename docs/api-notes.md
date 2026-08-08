@@ -229,6 +229,48 @@ a **list**. pyskylight returns `list[Chore]` and `list[Reward]` for those two.
 **Colors are validated** against the palette from `GET /api/colors`; an
 arbitrary hex is rejected with `Color is invalid`.
 
+## Nudges, verified against a test frame
+
+A nudge is a spoken reminder: the frame reads the `body` aloud at `deliver_at`,
+to the profiles in `category_ids`.
+
+**A calendar display never plays one.** Two nudges were sent to a real
+`15-CAL-2.0` targeting a family member — one with `deliver_at` set to now, one
+scheduled two minutes ahead. Neither was heard, and neither appeared on the
+frame, while every API-side signal said it had worked: the resource was created,
+the audio rendered, the listing showed it.
+
+This is most likely the Buddy split that alarms make explicit with `422 Device
+must be a buddy device`. Alarms hang off a *device*, so there is something to
+validate against; nudges hang off the *frame*, where nothing knows what hardware
+will have to speak them, so the write is accepted regardless. Treat a successful
+`create_nudge` as no evidence that anybody will hear it.
+
+**The speech is rendered in the cloud.** `audio_url` is `null` on the created
+resource and holds a presigned S3 URL for `nudge_<id>.mp3` within about ten
+seconds. The URL is signed per read with a short expiry, so it is a thing to
+fetch, never a thing to store.
+
+**Both `deliver_at` and `category_ids` are required**, and neither is validated
+beyond being present: an empty list is `422 Category ids is required`, while a
+`deliver_at` in the past is accepted without complaint. Whether the frame plays
+a nudge whose time has already passed is unknown — it cannot be observed through
+the API, and needs a real frame within earshot.
+
+**`voice_kind` defaults to `kirk_voice`.** An unknown value returns a
+`500 Internal Server Error` rather than a validation error, so the valid set
+cannot be enumerated by probing, and there is no endpoint listing voices the way
+`GET /api/colors` lists the palette.
+
+**Delivered nudges are not cleaned up.** They stay listed indefinitely, so the
+listing is a history as well as a schedule.
+
+**`after` and `before` are both required** (`422 After/Before is required`), and
+`before` behaves as an instant at midnight UTC rather than as an inclusive day:
+a nudge at `2026-08-09T03:01Z` is absent from a query with `before=2026-08-09`,
+even though that instant is the evening of the 8th in the frame's own timezone.
+To cover a day, pass the day after it. Only that one boundary was tested.
+
 ## Device settings, verified against live hardware
 
 Tested against a real, activated display, each write read back and restored.
