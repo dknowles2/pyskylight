@@ -1078,7 +1078,14 @@ class Skylight:
         )
 
     async def create_alarm(self, frame_id: str | int, device_id: str | int, **fields: Any) -> _JSON:
-        """Create an alarm on a device."""
+        """Create an alarm on a device.
+
+        Warning:
+            Alarms are a Skylight Buddy feature. On a calendar display this
+            returns ``422 Device must be a buddy device`` regardless of the
+            body — the check runs before field validation, so the accepted
+            fields are unknown. Verified against a ``15-CAL-2.0``.
+        """
         return await self.request(
             "POST", f"{API_PREFIX}/frames/{frame_id}/devices/{device_id}/alarms", json=fields
         )

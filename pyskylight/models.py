@@ -332,7 +332,11 @@ class Device(ApiObject):
 class Alarm(ApiObject):
     """An alarm configured on a device.
 
-    No alarm body has been captured yet; read :attr:`attributes`.
+    No alarm body has been captured yet; read :attr:`attributes`. Alarms are a
+    Skylight Buddy feature: creating one on a calendar display is rejected with
+    ``422 Device must be a buddy device`` before the body is validated, so the
+    field names cannot be discovered without Buddy hardware. Listing alarms on
+    a non-Buddy device works and returns none.
     """
 
 
