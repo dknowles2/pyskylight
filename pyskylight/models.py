@@ -27,8 +27,10 @@ __all__ = [
     "ListItem",
     "ListItemStatus",
     "ListKind",
+    "MealCategory",
     "NightlightColor",
     "Nudge",
+    "Recipe",
     "Reward",
     "RewardPoint",
     "SkylightList",
@@ -263,6 +265,46 @@ class SkylightList(ApiObject):
     list_item_ids: list[str] = field(default_factory=list, metadata=relationships("list_items"))
     items: list[ListItem] = field(default_factory=list, compare=False)
     sections: list[dict[str, Any]] = field(default_factory=list, compare=False)
+
+
+@dataclass(frozen=True, kw_only=True)
+class MealCategory(ApiObject):
+    """A slot in the meal planner — Breakfast, Lunch, Dinner, Snack.
+
+    The four are created with the frame and shared by every recipe; nothing
+    observed creates a fifth.
+    """
+
+    label: str | None = None
+    color: str | None = None
+    enabled: bool | None = None
+    position: int | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class Recipe(ApiObject):
+    """A recipe in the frame's meal planner.
+
+    The name is :attr:`summary`, not ``title``. :attr:`description` is one free
+    text field holding both the ingredients and the method, in the loose shape
+    the app writes::
+
+        Ingredients:
+        - Cereal
+        - Milk
+
+        Instructions:
+        1. Pour milk over cereal and enjoy.
+
+    Nothing enforces that shape, and there is no structured ingredient list —
+    :meth:`~pyskylight.Skylight.add_recipe_to_grocery_list` is what turns the
+    text into list items, server-side.
+    """
+
+    summary: str | None = None
+    description: str | None = None
+    draft: bool | None = None
+    meal_category_id: str | None = field(default=None, metadata=relationship("meal_category"))
 
 
 @dataclass(frozen=True, kw_only=True)

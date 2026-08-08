@@ -229,6 +229,40 @@ a **list**. pyskylight returns `list[Chore]` and `list[Reward]` for those two.
 **Colors are validated** against the palette from `GET /api/colors`; an
 arbitrary hex is rejected with `Color is invalid`.
 
+## Meals, verified against a test frame
+
+**A recipe's name is `summary`.** There is no `title`. `description` is one free
+text field carrying both halves, in the loose shape the app writes:
+
+```
+Ingredients:
+- Cereal
+- Milk
+
+Instructions:
+1. Pour milk over cereal and enjoy.
+```
+
+Nothing enforces that shape, and there is no structured ingredient list anywhere
+on the resource.
+
+**`meal_category_id` is required to create one**, and its absence is a bare
+`422 Unprocessable Entity` naming no field — unlike most validation failures
+here, which say what is missing. The four categories (Breakfast, Lunch, Dinner,
+Snack) come with the frame; nothing observed creates a fifth.
+
+**`add_to_grocery_list` is asynchronous.** It returns the recipe immediately,
+with `meta.auto_creation_intent_id` and a matching `tool_call_id` — Skylight
+parses the ingredients out of the free text server-side, and the items appear a
+few seconds later. Re-reading the list straight after the call shows nothing;
+about ten seconds in, `- Tortillas / - Ground beef / - Salsa` had become three
+list items.
+
+**The destination is not a choice.** Ingredients always land on the list whose
+`default_grocery_list` is set. Verified by giving a frame a second shopping list
+and adding a recipe: the default took all three items and the second stayed
+empty. A client offering to pick a list would be lying.
+
 ## Nudges, verified against a test frame
 
 A nudge is a spoken reminder: the frame reads the `body` aloud at `deliver_at`,
