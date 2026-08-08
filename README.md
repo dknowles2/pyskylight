@@ -164,6 +164,25 @@ data = await skylight.request("GET", f"/api/frames/{frame_id}/month_in_review")
 All derive from `SkylightError`. `304 Not Modified` and `204 No Content` return `None`
 (empty lists for list endpoints).
 
+## Logging
+
+Every request is logged at `DEBUG` on the `pyskylight.client` logger, as method, path,
+status and duration:
+
+```
+DEBUG pyskylight.client: GET /api/frames/5455113/categories -> 200 in 74ms
+```
+
+Deliberately nothing else. Bodies carry chore summaries and calendar entries, and headers
+carry the bearer token; neither belongs in a log someone is about to paste into a bug
+report. When a request fails, `ApiError.url` names it too.
+
+```python
+import logging
+
+logging.getLogger("pyskylight").setLevel(logging.DEBUG)
+```
+
 ## Development
 
 This project uses [uv](https://docs.astral.sh/uv/). One command sets up a virtualenv

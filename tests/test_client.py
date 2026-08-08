@@ -1,5 +1,6 @@
 """Tests for the Skylight client's request handling and endpoint wiring."""
 
+import logging
 from datetime import datetime, timezone
 
 import aiohttp
@@ -373,3 +374,32 @@ async def test_nightlight_colors_are_enumerated():
     # The set accepted by a live display; white, warm and purple are refused.
     assert NightlightColor.ALL == ("off", "red", "orange", "yellow", "green", "blue", "pink")
     assert NightlightColor.OFF in NightlightColor.ALL
+
+
+async def test_requests_are_logged_without_secrets(client, api, caplog):
+    """A debug log has to name the endpoint, and nothing that should stay private.
+
+    Without this the only trace of a failed request is its status, which is what
+    a downstream integration ends up reporting to its users.
+    """
+    caplog.set_level(logging.DEBUG, logger="pyskylight.client")
+    api.queue({"data": []})
+
+    await client.get_categories(FRAME)
+
+    logged = [record.getMessage() for record in caplog.records]
+    assert any(f"GET /api/frames/{FRAME}/categories -> 200" in line for line in logged)
+    # The bearer token travels in a header on every request.
+    assert not any("t0k3n" in line for line in logged)
+
+
+async def test_a_failing_request_is_logged_with_its_status(client, api, caplog):
+    """The status is logged before the error is raised, so both are in the log."""
+    caplog.set_level(logging.DEBUG, logger="pyskylight.client")
+    api.queue({"errors": ["boom"]}, status=500)
+
+    with pytest.raises(ApiError) as err:
+        await client.get_categories(FRAME)
+
+    assert err.value.url.endswith(f"/api/frames/{FRAME}/categories")
+    assert any("-> 500" in record.getMessage() for record in caplog.records)
