@@ -314,6 +314,42 @@ device attributes carry no `buddy` flag, but they do carry `role`, which is
 Buddy to compare against. `GET` and `DELETE` on the alarms collection work on a
 non-Buddy device and simply report none.
 
+**Nightlight is *not* Buddy-gated, despite looking like it should be.** A
+nightlight reads like a Buddy feature, and it is tempting to assume the three
+`nightlight*` fields are as unreachable on a calendar as alarms are. They are
+not. Checked in a single run against one `15-CAL-2.0`, so the contrast is
+between two calls to the same device minutes apart:
+
+| Call | Result |
+| --- | --- |
+| `POST .../devices/{id}/alarms` | `422 Device must be a buddy device` |
+| `GET .../devices/{id}` | returns `nightlight`, `nightlight_brightness`, `nightlight_color`, with stored non-default values |
+| `PUT nightlight: true` | `200`, re-read confirms |
+| `PUT nightlight_brightness: 33` | `200`, re-read confirms |
+| `PUT nightlight_color: "green"` | `200`, re-read confirms |
+| `PUT nightlight_color: "purple"` | `422 Nightlight color is not included in the list` |
+
+Present, writable, persisted across an independent `GET`, and enum-validated —
+on hardware that refuses a Buddy-only endpoint in the same breath. So there is
+no capability signal to act on: a client cannot tell from the API that these
+controls might be inert, and hiding them by hardware model would hide controls
+the server accepts and stores.
+
+What the API cannot answer is whether the panel physically lights up. That is
+worth stating plainly rather than inferring either way from a `200`.
+
+**There is no capability map covering any of this.** Frames carry a
+`feature_bundle` — `albums`, `chores`, `timers`, `screensaver` and about twenty
+more, each `{"enabled": bool}`, under a `bundle_name` (`cal_plus` on a Plus
+calendar). Neither alarms nor nightlight appear in it, so it cannot be used to
+predict either result above.
+
+**`hardware_model` is on the frame, not the device, and only in the detail
+endpoint.** `GET /api/frames/{id}` returns `"15-CAL-2.0"`; `GET /api/frames`
+omits the field entirely, and no device attribute carries a model at all. Any
+client wanting the model must spend a per-frame request on it — it is static, so
+fetch it once.
+
 **Occasional 500s.** A poll against a healthy account returned `500 Internal Server
 Error` once, and thirty consecutive calls across every endpoint afterwards were clean, so
 it is transient rather than an endpoint being broken. Worth expecting rather than

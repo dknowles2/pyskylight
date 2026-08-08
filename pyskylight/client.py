@@ -1074,6 +1074,13 @@ class Skylight:
         :class:`~pyskylight.models.NightlightColor`. ``sleep_mode`` accepts only
         its current value; anything else returns a 500.
 
+        The ``nightlight*`` fields are **not** Buddy-gated, unlike
+        :meth:`create_alarm`. On a ``15-CAL-2.0`` they are returned by ``GET``,
+        accepted here, persisted, and enum-validated — verified on a device that
+        refused an alarm with ``422 Device must be a buddy device`` in the same
+        run. Whether the panel physically lights up is not something the API
+        reports, so there is nothing here for a client to gate on.
+
         Args:
             frame_id: The frame the device belongs to.
             device_id: The device to update.
