@@ -230,10 +230,26 @@ read-only until that is understood.
 `422 Contact help@myskylight.com to rename this device`. It succeeds on a frame
 with no display attached, which is why the earlier write testing missed it.
 
+**Alarms need a Buddy device.** `POST
+/api/frames/{id}/devices/{id}/alarms` on a calendar display returns
+`422 Device must be a buddy device`, whatever the body — an empty object, a
+`time`, or a `name` all fail identically, before any field validation runs. So
+the alarm body remains uncaptured, and `Alarm` still exposes only
+`attributes`.
+
+Skylight Buddy is a separate product; a `15-CAL-2.0` calendar is not one. The
+device attributes carry no `buddy` flag, but they do carry `role`, which is
+`null` on this hardware — a plausible discriminator, unverified for want of a
+Buddy to compare against. `GET` and `DELETE` on the alarms collection work on a
+non-Buddy device and simply report none.
+
 ## Known gaps
 
-Device **alarms** are untested: the display has none configured, and creating
-one risks it audibly ringing. `reset_device` (factory reset) and `delete_device`
-(unpairing) are deliberately not exercised, and `reset_device` is not
-implemented at all. Account-level writes (`update_user`, `delete_user`,
-notification toggles) are untested too, having no clean undo.
+**Alarms** cannot be exercised without Buddy hardware, per the note above. The
+schema is unknown, not merely unwritten: the server rejects the request before
+it validates the body.
+
+`reset_device` (factory reset) and `delete_device` (unpairing) are deliberately
+not exercised, and `reset_device` is not implemented at all. Account-level
+writes (`update_user`, `delete_user`, notification toggles) are untested too,
+having no clean undo.
