@@ -27,6 +27,7 @@ __all__ = [
     "ListItem",
     "ListItemStatus",
     "ListKind",
+    "NightlightColor",
     "Nudge",
     "Reward",
     "RewardPoint",
@@ -61,6 +62,24 @@ class ListKind:
 
     SHOPPING = "shopping"
     TODO = "to_do"
+
+
+class NightlightColor:
+    """Values accepted by a device's ``nightlight_color``.
+
+    Probed against a live display; ``white``, ``warm`` and ``purple`` are
+    rejected with ``422 Nightlight color is not included in the list``.
+    """
+
+    OFF = "off"
+    RED = "red"
+    ORANGE = "orange"
+    YELLOW = "yellow"
+    GREEN = "green"
+    BLUE = "blue"
+    PINK = "pink"
+
+    ALL = (OFF, RED, ORANGE, YELLOW, GREEN, BLUE, PINK)
 
 
 class ApplyTo:

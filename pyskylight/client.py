@@ -289,11 +289,24 @@ class Skylight:
         return Frame.from_document(await self._get(f"{API_PREFIX}/frames/photo"))
 
     async def update_frame(self, frame_id: str | int, **fields: Any) -> _JSON:
-        """Update frame settings."""
+        """Update frame settings.
+
+        Warning:
+            Display settings do not belong here. Sending ``brightness``,
+            ``sleeps_at``, ``slideshow_speed``, ``show_caption`` and friends to
+            this endpoint returns ``200`` and changes nothing — verified against
+            a live frame. Use :meth:`update_device`, which does apply them.
+        """
         return await self.request("PUT", f"{API_PREFIX}/frames/{frame_id}", json=fields)
 
     async def rename_frame(self, frame_id: str | int, name: str) -> _JSON:
-        """Rename a frame."""
+        """Rename a frame.
+
+        Note:
+            Skylight refuses this for activated hardware, answering
+            ``422 Contact help@myskylight.com to rename this device``. It
+            succeeds for frames with no display attached.
+        """
         return await self.request(
             "PUT", f"{API_PREFIX}/frames/{frame_id}/rename", json={"name": name}
         )
@@ -1019,11 +1032,40 @@ class Skylight:
             await self._get(f"{API_PREFIX}/frames/{frame_id}/devices/{device_id}")
         )
 
-    async def rename_device(self, frame_id: str | int, device_id: str | int, name: str) -> _JSON:
-        """Rename a device."""
-        return await self.request(
-            "PUT", f"{API_PREFIX}/frames/{frame_id}/devices/{device_id}", json={"name": name}
+    async def update_device(
+        self, frame_id: str | int, device_id: str | int, **fields: Any
+    ) -> Device:
+        """Change settings on a physical display.
+
+        This is where display settings live. ``PUT /api/frames/{id}`` accepts
+        the same field names and returns ``200``, but silently applies nothing —
+        see :meth:`update_frame`.
+
+        Verified writable against a live display: ``brightness``, ``nightlight``,
+        ``nightlight_brightness``, ``sleep_sound_volume``, ``sleeps_at``,
+        ``wakes_at``, ``slideshow_speed``, ``show_caption``, ``blur_effect``,
+        ``side_by_side``, ``show_heart``, and ``name``.
+
+        ``nightlight_color`` is an enum — see
+        :class:`~pyskylight.models.NightlightColor`. ``sleep_mode`` accepts only
+        its current value; anything else returns a 500.
+
+        Args:
+            frame_id: The frame the device belongs to.
+            device_id: The device to update.
+            **fields: Device fields to change.
+        """
+        return Device.one_from_document(
+            await self.request(
+                "PUT",
+                f"{API_PREFIX}/frames/{frame_id}/devices/{device_id}",
+                json=dict(fields),
+            )
         )
+
+    async def rename_device(self, frame_id: str | int, device_id: str | int, name: str) -> Device:
+        """Rename a device."""
+        return await self.update_device(frame_id, device_id, name=name)
 
     async def delete_device(self, frame_id: str | int, device_id: str | int) -> None:
         """Remove a device from the frame."""

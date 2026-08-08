@@ -123,7 +123,9 @@ Some endpoints reject requests that omit an optional-looking parameter, so pysky
 those required: `get_countdowns(frame_id, timezone)`, `get_nudges(frame_id, after, before)`,
 `get_meal_sittings(frame_id, date_min, date_max)`.
 
-Write calls send flat bodies, not JSON:API documents, and several have sharp edges the
+Display settings belong to the device, not the frame: `update_frame()` accepts them and
+silently applies nothing, while `update_device()` works. Write calls send flat bodies, not
+JSON:API documents, and several have sharp edges the
 published spec does not mention — `"complete"` rather than `"completed"`, `apply_to` being
 forbidden on one-time chores, `move_chore` taking a neighbour instead of an index. All of
 it is verified against a live test frame and written up in
