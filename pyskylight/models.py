@@ -312,7 +312,12 @@ class Frame(ApiObject):
 
 @dataclass(frozen=True, kw_only=True)
 class Device(ApiObject):
-    """A physical Skylight device registered to a frame."""
+    """A physical Skylight device registered to a frame.
+
+    Attributes:
+        role: ``"buddy"`` on a Skylight Buddy, ``None`` on a calendar or photo
+            display. See :attr:`is_buddy`.
+    """
 
     name: str | None = None
     role: str | None = None
@@ -339,16 +344,32 @@ class Device(ApiObject):
     show_heart: bool | None = None
     start_sound: bool | None = None
 
+    @property
+    def is_buddy(self) -> bool:
+        """Whether this is a Skylight Buddy rather than a calendar or photo frame.
+
+        Worth checking before offering the nightlight or sleep sound settings.
+        Those are Buddy features, but a calendar display reports them, accepts
+        writes, and stores what it is given — only alarms are refused outright.
+        Skylight's own client draws the line here, on ``role``, and so should
+        anything built on this library. See ``docs/api-notes.md``.
+        """
+        return self.role == "buddy"
+
 
 @dataclass(frozen=True, kw_only=True)
 class Alarm(ApiObject):
     """An alarm configured on a device.
 
-    No alarm body has been captured yet; read :attr:`attributes`. Alarms are a
-    Skylight Buddy feature: creating one on a calendar display is rejected with
-    ``422 Device must be a buddy device`` before the body is validated, so the
-    field names cannot be discovered without Buddy hardware. Listing alarms on
-    a non-Buddy device works and returns none.
+    No alarm body has been captured from live traffic; read :attr:`attributes`.
+    Alarms are a Skylight Buddy feature: creating one on a calendar display is
+    rejected with ``422 Device must be a buddy device`` before the body is
+    validated. Listing alarms on a non-Buddy device works and returns none.
+
+    The field names are known from the app's own defaults — ``time``, ``hour``,
+    ``minute``, ``enabled``, ``volume``, ``sound``, ``label``, ``snoozable``,
+    ``rrule``, ``fires_on`` — but nothing here is typed from them until they can
+    be confirmed against Buddy hardware. See ``docs/api-notes.md``.
     """
 
 

@@ -1074,12 +1074,16 @@ class Skylight:
         :class:`~pyskylight.models.NightlightColor`. ``sleep_mode`` accepts only
         its current value; anything else returns a 500.
 
-        The ``nightlight*`` fields are **not** Buddy-gated, unlike
-        :meth:`create_alarm`. On a ``15-CAL-2.0`` they are returned by ``GET``,
-        accepted here, persisted, and enum-validated — verified on a device that
-        refused an alarm with ``422 Device must be a buddy device`` in the same
-        run. Whether the panel physically lights up is not something the API
-        reports, so there is nothing here for a client to gate on.
+        Warning:
+            Writable is not the same as supported. The ``nightlight*`` and
+            ``sleep_sound*`` fields are Skylight Buddy settings, and a calendar
+            display still returns them, accepts writes, persists them, and
+            validates the colour enum — a ``200`` here proves only that the
+            server stored the value. Unlike :meth:`create_alarm`, nothing is
+            rejected. Skylight's own client offers these controls only for a
+            device whose ``role`` is ``"buddy"``, and never touches
+            ``nightlight_color`` at all. Gate on :attr:`Device.role`; see
+            ``docs/api-notes.md``.
 
         Args:
             frame_id: The frame the device belongs to.
