@@ -32,7 +32,9 @@ from .models import (
     Device,
     Frame,
     ListItem,
+    MealCategory,
     Nudge,
+    Recipe,
     Reward,
     RewardPoint,
     SkylightList,
@@ -1074,12 +1076,16 @@ class Skylight:
         :class:`~pyskylight.models.NightlightColor`. ``sleep_mode`` accepts only
         its current value; anything else returns a 500.
 
-        The ``nightlight*`` fields are **not** Buddy-gated, unlike
-        :meth:`create_alarm`. On a ``15-CAL-2.0`` they are returned by ``GET``,
-        accepted here, persisted, and enum-validated — verified on a device that
-        refused an alarm with ``422 Device must be a buddy device`` in the same
-        run. Whether the panel physically lights up is not something the API
-        reports, so there is nothing here for a client to gate on.
+        Warning:
+            Writable is not the same as supported. The ``nightlight*`` and
+            ``sleep_sound*`` fields are Skylight Buddy settings, and a calendar
+            display still returns them, accepts writes, persists them, and
+            validates the colour enum — a ``200`` here proves only that the
+            server stored the value. Unlike :meth:`create_alarm`, nothing is
+            rejected. Skylight's own client offers these controls only for a
+            device whose ``role`` is ``"buddy"``, and never touches
+            ``nightlight_color`` at all. Gate on :attr:`Device.role`; see
+            ``docs/api-notes.md``.
 
         Args:
             frame_id: The frame the device belongs to.
@@ -1385,27 +1391,61 @@ class Skylight:
 
     # ------------------------------------------------------------------ meals
 
-    async def get_meal_categories(self, frame_id: str | int) -> _JSON:
-        """Get meal categories."""
-        return await self._get(f"{API_PREFIX}/frames/{frame_id}/meals/categories")
-
-    async def get_meal_recipes(self, frame_id: str | int) -> _JSON:
-        """List recipes, with their meal categories side-loaded."""
-        return await self._get(
-            f"{API_PREFIX}/frames/{frame_id}/meals/recipes", include="meal_category"
+    async def get_meal_categories(self, frame_id: str | int) -> list[MealCategory]:
+        """List the meal planner's slots — Breakfast, Lunch, Dinner, Snack."""
+        return MealCategory.from_document(
+            await self._get(f"{API_PREFIX}/frames/{frame_id}/meals/categories")
         )
 
-    async def create_meal_recipe(self, frame_id: str | int, **fields: Any) -> _JSON:
-        """Create a recipe."""
-        return await self.request(
-            "POST",
-            f"{API_PREFIX}/frames/{frame_id}/meals/recipes",
-            params=_params(include="meal_category"),
-            json=fields,
+    async def get_meal_recipes(self, frame_id: str | int) -> list[Recipe]:
+        """List recipes, with their meal categories side-loaded."""
+        return Recipe.from_document(
+            await self._get(
+                f"{API_PREFIX}/frames/{frame_id}/meals/recipes", include="meal_category"
+            )
+        )
+
+    async def create_meal_recipe(
+        self, frame_id: str | int, summary: str, meal_category_id: str | int, **fields: Any
+    ) -> Recipe:
+        """Create a recipe.
+
+        Args:
+            frame_id: The frame to create the recipe on.
+            summary: The recipe's name — the API has no ``title`` field.
+            meal_category_id: Which planner slot it belongs to. Required; without
+                it the call is a bare ``422`` naming no field.
+            **fields: Any other recipe fields — chiefly ``description``, the free
+                text holding both ingredients and method.
+        """
+        return Recipe.one_from_document(
+            await self.request(
+                "POST",
+                f"{API_PREFIX}/frames/{frame_id}/meals/recipes",
+                params=_params(include="meal_category"),
+                json=_body(summary=summary, meal_category_id=str(meal_category_id), **fields),
+            )
         )
 
     async def add_recipe_to_grocery_list(self, frame_id: str | int, recipe_id: str | int) -> _JSON:
-        """Add a recipe's ingredients to the grocery list."""
+        """Add a recipe's ingredients to the frame's default grocery list.
+
+        Returns:
+            The recipe, with the queued job's id under
+            ``meta.auto_creation_intent_id``.
+
+        Note:
+            The work happens **after** the response. Skylight parses the
+            ingredients out of the free-text ``description`` server-side, and the
+            items appear on the list a few seconds later — about ten in
+            practice. A caller that re-reads the list immediately sees nothing.
+
+        Warning:
+            The destination is not a choice. Ingredients always land on the list
+            whose :attr:`~pyskylight.models.SkylightList.default_grocery_list` is
+            set, verified on a frame carrying two shopping lists: the second
+            stayed empty.
+        """
         return await self.request(
             "POST",
             f"{API_PREFIX}/frames/{frame_id}/meals/recipes/{recipe_id}/add_to_grocery_list",

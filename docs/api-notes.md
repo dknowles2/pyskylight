@@ -229,6 +229,40 @@ a **list**. pyskylight returns `list[Chore]` and `list[Reward]` for those two.
 **Colors are validated** against the palette from `GET /api/colors`; an
 arbitrary hex is rejected with `Color is invalid`.
 
+## Meals, verified against a test frame
+
+**A recipe's name is `summary`.** There is no `title`. `description` is one free
+text field carrying both halves, in the loose shape the app writes:
+
+```
+Ingredients:
+- Cereal
+- Milk
+
+Instructions:
+1. Pour milk over cereal and enjoy.
+```
+
+Nothing enforces that shape, and there is no structured ingredient list anywhere
+on the resource.
+
+**`meal_category_id` is required to create one**, and its absence is a bare
+`422 Unprocessable Entity` naming no field — unlike most validation failures
+here, which say what is missing. The four categories (Breakfast, Lunch, Dinner,
+Snack) come with the frame; nothing observed creates a fifth.
+
+**`add_to_grocery_list` is asynchronous.** It returns the recipe immediately,
+with `meta.auto_creation_intent_id` and a matching `tool_call_id` — Skylight
+parses the ingredients out of the free text server-side, and the items appear a
+few seconds later. Re-reading the list straight after the call shows nothing;
+about ten seconds in, `- Tortillas / - Ground beef / - Salsa` had become three
+list items.
+
+**The destination is not a choice.** Ingredients always land on the list whose
+`default_grocery_list` is set. Verified by giving a frame a second shopping list
+and adding a recipe: the default took all three items and the second stayed
+empty. A client offering to pick a list would be lying.
+
 ## Nudges, verified against a test frame
 
 A nudge is a spoken reminder: the frame reads the `body` aloud at `deliver_at`,
@@ -308,17 +342,25 @@ with no display attached, which is why the earlier write testing missed it.
 the alarm body remains uncaptured, and `Alarm` still exposes only
 `attributes`.
 
-Skylight Buddy is a separate product; a `15-CAL-2.0` calendar is not one. The
-device attributes carry no `buddy` flag, but they do carry `role`, which is
-`null` on this hardware — a plausible discriminator, unverified for want of a
-Buddy to compare against. `GET` and `DELETE` on the alarms collection work on a
-non-Buddy device and simply report none.
+Skylight Buddy is a separate product; a `15-CAL-2.0` calendar is not one.
+`GET` and `DELETE` on the alarms collection work on a non-Buddy device and
+simply report none.
 
-**Nightlight is *not* Buddy-gated, despite looking like it should be.** A
-nightlight reads like a Buddy feature, and it is tempting to assume the three
-`nightlight*` fields are as unreachable on a calendar as alarms are. They are
-not. Checked in a single run against one `15-CAL-2.0`, so the contrast is
-between two calls to the same device minutes apart:
+**`role == "buddy"` is the discriminator.** The device attributes carry no
+`buddy` flag, but they do carry `role`, `null` on a calendar. That was a guess
+here until the vendor's own web client confirmed it — its `deviceUtils.isBuddy`
+is exactly:
+
+```js
+function t(t){return !!t && 'buddy' === t.attributes.role}
+```
+
+and `areAllBuddyDevices` (every device passing that test) is what routes the app
+to its Buddy screens instead of its calendar ones.
+
+**The nightlight and sleep sound are Buddy features, and the API will not tell
+you so.** This is the trap worth reading before trusting a `200` from
+`update_device`. On a `15-CAL-2.0`, in a single run:
 
 | Call | Result |
 | --- | --- |
@@ -330,25 +372,45 @@ between two calls to the same device minutes apart:
 | `PUT nightlight_color: "purple"` | `422 Nightlight color is not included in the list` |
 
 Present, writable, persisted across an independent `GET`, and enum-validated —
-on hardware that refuses a Buddy-only endpoint in the same breath. So there is
-no capability signal to act on: a client cannot tell from the API that these
-controls might be inert, and hiding them by hardware model would hide controls
-the server accepts and stores.
+on the same device, minutes apart from the alarm rejection. Every server-side
+signal says these fields work. They are still Buddy-only:
 
-What the API cannot answer is whether the panel physically lights up. That is
-worth stating plainly rather than inferring either way from a `200`.
+- The app renders the nightlight toggle and its brightness slider in exactly one
+  place, its Buddy sleep screen, under the label key `buddy:label.nightlight`,
+  alongside Buddy sleep sounds and built from `buddyConstants`.
+- `nightlight_color` appears **nowhere** in the app bundle. No Skylight client
+  reads or writes it on any device.
+- Sleep sounds are the same story: `buddyConstants.sleepSounds` is
+  `brown_noise`, `ocean_waves`, `rain`, `stream`, `white_noise`, offered only on
+  that Buddy screen. A calendar reports `sleep_sound: null` with a stored
+  `sleep_sound_volume`.
+
+So the Buddy check that rejects alarms does not extend to these fields — they
+are simply columns the server will store for anything. A `200` means the value
+was persisted, not that any hardware acts on it, and a client that treats
+"writable" as "supported" will offer controls that do nothing. Gate on `role`.
+
+**`sleep_mode` is `screen_off` or `dim_clock`**, from the same `buddyConstants`.
+The 500s recorded above came from guessing at names — `off`, `nightlight`,
+`dim`, `clock_only`, `photo`, `sleep_sound` are all invalid, and `dim_clock` was
+never among the values tried. Untested against live hardware.
+
+**The alarm body is known after all**, from the app's `defaultAlarmAttributes`:
+`time` (`"08:30"`), `hour`, `minute`, `enabled`, `volume`, `sound`
+(`"marimba"`), `label`, `snoozable`, `rrule`, `fires_on`. Still unverified — the
+endpoint refuses a non-Buddy device before it looks at the body — so `Alarm`
+continues to expose only `attributes`.
 
 **There is no capability map covering any of this.** Frames carry a
 `feature_bundle` — `albums`, `chores`, `timers`, `screensaver` and about twenty
 more, each `{"enabled": bool}`, under a `bundle_name` (`cal_plus` on a Plus
-calendar). Neither alarms nor nightlight appear in it, so it cannot be used to
-predict either result above.
+calendar). Neither alarms nor nightlight appear in it. `role` is the only
+signal.
 
 **`hardware_model` is on the frame, not the device, and only in the detail
 endpoint.** `GET /api/frames/{id}` returns `"15-CAL-2.0"`; `GET /api/frames`
-omits the field entirely, and no device attribute carries a model at all. Any
-client wanting the model must spend a per-frame request on it — it is static, so
-fetch it once.
+omits the field entirely, and no device attribute carries a model at all. It is
+also not what the app gates on, so prefer `role` for capability questions.
 
 **Occasional 500s.** A poll against a healthy account returned `500 Internal Server
 Error` once, and thirty consecutive calls across every endpoint afterwards were clean, so

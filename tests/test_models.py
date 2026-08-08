@@ -268,3 +268,21 @@ def test_calendar_event_handles_both_category_relationship_shapes():
     assert plural.category_ids == ["77"]
     assert plural.category_id is None
     assert plural.rrule == ["RRULE:FREQ=DAILY"]
+
+
+def test_is_buddy_reads_the_role_attribute():
+    """The one signal that says whether the Buddy-only settings mean anything.
+
+    A calendar display reports `nightlight` and friends, accepts writes to them
+    and stores them, so `role` is all a caller has to go on. Skylight's own
+    client tests exactly this.
+    """
+    from pyskylight.models import Device
+
+    def device(**attributes):
+        return Device.from_resource({"type": "device", "id": "1", "attributes": attributes})
+
+    assert device(role="buddy").is_buddy
+    # A calendar display: the field is present and null, not missing.
+    assert not device(role=None, nightlight=True).is_buddy
+    assert not device().is_buddy

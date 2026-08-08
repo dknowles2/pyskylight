@@ -27,8 +27,10 @@ __all__ = [
     "ListItem",
     "ListItemStatus",
     "ListKind",
+    "MealCategory",
     "NightlightColor",
     "Nudge",
+    "Recipe",
     "Reward",
     "RewardPoint",
     "SkylightList",
@@ -266,6 +268,46 @@ class SkylightList(ApiObject):
 
 
 @dataclass(frozen=True, kw_only=True)
+class MealCategory(ApiObject):
+    """A slot in the meal planner — Breakfast, Lunch, Dinner, Snack.
+
+    The four are created with the frame and shared by every recipe; nothing
+    observed creates a fifth.
+    """
+
+    label: str | None = None
+    color: str | None = None
+    enabled: bool | None = None
+    position: int | None = None
+
+
+@dataclass(frozen=True, kw_only=True)
+class Recipe(ApiObject):
+    """A recipe in the frame's meal planner.
+
+    The name is :attr:`summary`, not ``title``. :attr:`description` is one free
+    text field holding both the ingredients and the method, in the loose shape
+    the app writes::
+
+        Ingredients:
+        - Cereal
+        - Milk
+
+        Instructions:
+        1. Pour milk over cereal and enjoy.
+
+    Nothing enforces that shape, and there is no structured ingredient list —
+    :meth:`~pyskylight.Skylight.add_recipe_to_grocery_list` is what turns the
+    text into list items, server-side.
+    """
+
+    summary: str | None = None
+    description: str | None = None
+    draft: bool | None = None
+    meal_category_id: str | None = field(default=None, metadata=relationship("meal_category"))
+
+
+@dataclass(frozen=True, kw_only=True)
 class Frame(ApiObject):
     """A Skylight frame — one household's device, calendar, and content."""
 
@@ -312,7 +354,12 @@ class Frame(ApiObject):
 
 @dataclass(frozen=True, kw_only=True)
 class Device(ApiObject):
-    """A physical Skylight device registered to a frame."""
+    """A physical Skylight device registered to a frame.
+
+    Attributes:
+        role: ``"buddy"`` on a Skylight Buddy, ``None`` on a calendar or photo
+            display. See :attr:`is_buddy`.
+    """
 
     name: str | None = None
     role: str | None = None
@@ -339,16 +386,32 @@ class Device(ApiObject):
     show_heart: bool | None = None
     start_sound: bool | None = None
 
+    @property
+    def is_buddy(self) -> bool:
+        """Whether this is a Skylight Buddy rather than a calendar or photo frame.
+
+        Worth checking before offering the nightlight or sleep sound settings.
+        Those are Buddy features, but a calendar display reports them, accepts
+        writes, and stores what it is given — only alarms are refused outright.
+        Skylight's own client draws the line here, on ``role``, and so should
+        anything built on this library. See ``docs/api-notes.md``.
+        """
+        return self.role == "buddy"
+
 
 @dataclass(frozen=True, kw_only=True)
 class Alarm(ApiObject):
     """An alarm configured on a device.
 
-    No alarm body has been captured yet; read :attr:`attributes`. Alarms are a
-    Skylight Buddy feature: creating one on a calendar display is rejected with
-    ``422 Device must be a buddy device`` before the body is validated, so the
-    field names cannot be discovered without Buddy hardware. Listing alarms on
-    a non-Buddy device works and returns none.
+    No alarm body has been captured from live traffic; read :attr:`attributes`.
+    Alarms are a Skylight Buddy feature: creating one on a calendar display is
+    rejected with ``422 Device must be a buddy device`` before the body is
+    validated. Listing alarms on a non-Buddy device works and returns none.
+
+    The field names are known from the app's own defaults — ``time``, ``hour``,
+    ``minute``, ``enabled``, ``volume``, ``sound``, ``label``, ``snoozable``,
+    ``rrule``, ``fires_on`` — but nothing here is typed from them until they can
+    be confirmed against Buddy hardware. See ``docs/api-notes.md``.
     """
 
 

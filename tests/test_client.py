@@ -157,6 +157,68 @@ async def test_get_list_resolves_items_and_sections(client, api):
     assert grocery.sections == [{"name": "Produce"}]
 
 
+async def test_get_meal_recipes_resolves_its_category(client, api):
+    api.queue(
+        {
+            "data": [
+                {
+                    "type": "meal_recipe",
+                    "id": "67098089",
+                    # The name is `summary`; there is no title field.
+                    "attributes": {
+                        "summary": "Milk & Cereal",
+                        "description": "Ingredients:\n- Cereal\n- Milk\n",
+                        "draft": False,
+                    },
+                    "relationships": {
+                        "meal_category": {"data": {"type": "meal_category", "id": "9354302"}}
+                    },
+                }
+            ],
+            "included": [
+                {
+                    "type": "meal_category",
+                    "id": "9354302",
+                    "attributes": {"label": "Breakfast"},
+                }
+            ],
+        }
+    )
+    recipes = await client.get_meal_recipes(FRAME)
+
+    assert [r.summary for r in recipes] == ["Milk & Cereal"]
+    assert recipes[0].meal_category_id == "9354302"
+    assert api.last.query["include"] == "meal_category"
+
+
+async def test_create_meal_recipe_requires_a_category(client, api):
+    api.queue({"data": {"type": "meal_recipe", "id": "1", "attributes": {"summary": "Tacos"}}})
+    recipe = await client.create_meal_recipe(
+        FRAME, "Tacos", 9354304, description="Ingredients:\n- Tortillas\n"
+    )
+
+    assert recipe.summary == "Tacos"
+    # Omitting meal_category_id is a bare 422 naming no field, so it is a
+    # positional argument rather than something to forget in **fields.
+    assert api.last.body == {
+        "summary": "Tacos",
+        "meal_category_id": "9354304",
+        "description": "Ingredients:\n- Tortillas\n",
+    }
+
+
+async def test_get_meal_categories(client, api):
+    api.queue(
+        {
+            "data": [
+                {"type": "meal_category", "id": "1", "attributes": {"label": "Breakfast"}},
+                {"type": "meal_category", "id": "3", "attributes": {"label": "Dinner"}},
+            ]
+        }
+    )
+    assert [c.label for c in await client.get_meal_categories(FRAME)] == ["Breakfast", "Dinner"]
+
+
 async def test_complete_chore_uses_complete_not_completed(client, api):
     api.queue({"data": {"type": "chore", "id": "9", "attributes": {"status": "pending"}}})
     await client.complete_chore(FRAME, 9, instance_date="2025-08-25")
