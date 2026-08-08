@@ -272,6 +272,11 @@ device attributes carry no `buddy` flag, but they do carry `role`, which is
 Buddy to compare against. `GET` and `DELETE` on the alarms collection work on a
 non-Buddy device and simply report none.
 
+**Occasional 500s.** A poll against a healthy account returned `500 Internal Server
+Error` once, and thirty consecutive calls across every endpoint afterwards were clean, so
+it is transient rather than an endpoint being broken. Worth expecting rather than
+diagnosing: callers should tolerate one, not treat it as the account being down.
+
 ## Known gaps
 
 **Alarms** cannot be exercised without Buddy hardware, per the note above. The

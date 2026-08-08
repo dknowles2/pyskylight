@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
+import time
 from collections.abc import Mapping, Sequence
 from datetime import date, datetime
 from types import TracebackType
@@ -38,6 +40,8 @@ from .models import (
     TaskBoxItem,
     User,
 )
+
+_LOGGER = logging.getLogger(__name__)
 
 __all__ = ["Skylight"]
 
@@ -191,6 +195,7 @@ class Skylight:
         allow_retry: bool = True,
     ) -> Any:
         url = f"{self._base_url}{path}"
+        started = time.monotonic()
         async with self._get_session().request(
             method,
             url,
@@ -199,6 +204,16 @@ class Skylight:
             headers=self._headers(token),
             timeout=self._timeout,
         ) as resp:
+            # Method, path and status only. Bodies carry chore summaries and
+            # calendar entries, headers carry the bearer token, and none of that
+            # belongs in a log the user is about to paste into an issue.
+            _LOGGER.debug(
+                "%s %s -> %s in %dms",
+                method,
+                path,
+                resp.status,
+                (time.monotonic() - started) * 1000,
+            )
             if resp.status == 304 or resp.status == 204:
                 return None
             body: Any = None
