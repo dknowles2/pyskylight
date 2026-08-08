@@ -1259,8 +1259,14 @@ class Skylight:
         Args:
             frame_id: The frame to query.
             after: Earliest date to include.
-            before: Latest date to include. Both bounds are required by the API,
-                which rejects a missing one with ``422 After/Before is required``.
+            before: Upper bound, which behaves as midnight UTC on that date
+                rather than as an inclusive day — pass the day *after* the last
+                one you want. Both bounds are required by the API, which rejects
+                a missing one with ``422 After/Before is required``.
+
+        Note:
+            Delivered nudges are not cleaned up, so this is a history as well as
+            a schedule.
         """
         return Nudge.from_document(
             await self._get(f"{API_PREFIX}/frames/{frame_id}/nudges", after=after, before=before)
@@ -1280,10 +1286,19 @@ class Skylight:
             frame_id: The frame to create the nudge on.
             body: What the nudge says. Required (``422 Body can't be blank``).
             deliver_at: When to play it. Required (``422 Deliver at can't be
-                blank``).
-            category_ids: Profiles the nudge is for. Required.
+                blank``), but not otherwise validated: a time in the past is
+                accepted without complaint.
+            category_ids: Profiles the nudge is for. Required; an empty list is
+                ``422 Category ids is required``.
             **fields: Any other nudge fields — ``recurring``, ``rrule``,
                 ``recurring_until``, ``voice_kind``, ``audio_url``.
+
+        Note:
+            The speech is rendered in the cloud: the returned nudge has a null
+            ``audio_url``, which fills in with a presigned MP3 URL within about
+            ten seconds. ``voice_kind`` defaults to ``kirk_voice``; an unknown
+            value returns a 500 rather than a validation error, and no endpoint
+            lists the valid voices.
         """
         return Nudge.one_from_document(
             await self.request(
