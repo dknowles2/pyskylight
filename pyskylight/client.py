@@ -1299,6 +1299,15 @@ class Skylight:
             ten seconds. ``voice_kind`` defaults to ``kirk_voice``; an unknown
             value returns a 500 rather than a validation error, and no endpoint
             lists the valid voices.
+
+        Warning:
+            A calendar display never plays a nudge. Two sent to a real
+            ``15-CAL-2.0`` — one for the current moment, one scheduled ahead —
+            were created, rendered, and listed, and neither was ever heard. This
+            looks like the Skylight Buddy split that alarms make explicit, except
+            that nudges hang off the frame rather than a device, so there is
+            nothing to reject the write. Success here says the resource exists,
+            not that anyone will hear it.
         """
         return Nudge.one_from_document(
             await self.request(

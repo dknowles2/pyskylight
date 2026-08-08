@@ -234,6 +234,18 @@ arbitrary hex is rejected with `Color is invalid`.
 A nudge is a spoken reminder: the frame reads the `body` aloud at `deliver_at`,
 to the profiles in `category_ids`.
 
+**A calendar display never plays one.** Two nudges were sent to a real
+`15-CAL-2.0` targeting a family member — one with `deliver_at` set to now, one
+scheduled two minutes ahead. Neither was heard, and neither appeared on the
+frame, while every API-side signal said it had worked: the resource was created,
+the audio rendered, the listing showed it.
+
+This is most likely the Buddy split that alarms make explicit with `422 Device
+must be a buddy device`. Alarms hang off a *device*, so there is something to
+validate against; nudges hang off the *frame*, where nothing knows what hardware
+will have to speak them, so the write is accepted regardless. Treat a successful
+`create_nudge` as no evidence that anybody will hear it.
+
 **The speech is rendered in the cloud.** `audio_url` is `null` on the created
 resource and holds a presigned S3 URL for `nudge_<id>.mp3` within about ten
 seconds. The URL is signed per read with a short expiry, so it is a thing to
