@@ -206,8 +206,13 @@ Publishing runs from CI via [PyPI Trusted Publishing](https://docs.pypi.org/trus
 so no API token is stored in the repository. One-time setup on PyPI (Account → Publishing):
 owner `dknowles2`, repository `pyskylight`, workflow `release.yml`, environment `pypi`.
 
-To cut a release, bump `version` in `pyproject.toml`, then publish a GitHub release tagged
-`vX.Y.Z`. The workflow refuses to publish if the tag and the packaged version disagree.
+To cut a release, publish a GitHub release tagged `vX.Y.Z`. That is the whole process —
+there is no version to bump, because `hatch-vcs` takes it from the tag.
+
+A build from an untagged commit is versioned from the last tag with a `.devN` suffix and a
+local `+g<sha>` segment, which PyPI refuses outright — so a stray publish cannot masquerade
+as a real release. The workflow still checks the tag against the built version, which now
+catches a shallow clone rather than a forgotten edit.
 `workflow_dispatch` publishes to TestPyPI for a dry run.
 
 ## Sources

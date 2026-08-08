@@ -26,12 +26,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # hatch-vcs reads the version from the git tags, which a shallow
+          # clone does not have.
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
 
       - name: Check the tag matches the packaged version
-        # A release tagged v0.2.0 that ships 0.1.0 is worse than a failed build.
+        # hatch-vcs derives the version from the tag, so this should be true by
+        # construction. It stays as a guard against the ways that silently
+        # breaks — a shallow clone, or tags missing from the checkout — which
+        # would otherwise publish a 0.0.x placeholder.
         if: github.event_name == 'release'
         run: |
           packaged=$(uv run --frozen python -c \

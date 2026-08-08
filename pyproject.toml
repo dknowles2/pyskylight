@@ -1,10 +1,13 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
 name = "pyskylight"
-version = "0.3.0"
+# Taken from the git tag by hatch-vcs, so cutting a release is just tagging.
+# A build from an untagged commit gets a .devN version derived from the last
+# tag, which is what makes an accidental publish from one obviously wrong.
+dynamic = ["version"]
 description = "Async Python client for the (unofficial) Skylight API"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -42,6 +45,9 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["pyskylight"]
+
+[tool.hatch.version]
+source = "vcs"
 
 [tool.ruff]
 line-length = 100

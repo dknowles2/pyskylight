@@ -94,6 +94,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          # hatch-vcs reads the version from the git tags, which a shallow
+          # clone does not have.
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@v9.0.0
       - run: uv build
       - name: Check package metadata
