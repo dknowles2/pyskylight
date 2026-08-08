@@ -42,6 +42,7 @@ from .models import (
     ListItem,
     ListItemStatus,
     ListKind,
+    NightlightColor,
     Nudge,
     Reward,
     RewardPoint,
@@ -52,7 +53,7 @@ from .models import (
     User,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "Alarm",
@@ -72,6 +73,7 @@ __all__ = [
     "ListItem",
     "ListItemStatus",
     "ListKind",
+    "NightlightColor",
     "NotAuthorizedError",
     "NotFoundError",
     "Nudge",

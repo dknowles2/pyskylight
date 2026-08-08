@@ -200,9 +200,40 @@ a **list**. pyskylight returns `list[Chore]` and `list[Reward]` for those two.
 **Colors are validated** against the palette from `GET /api/colors`; an
 arbitrary hex is rejected with `Color is invalid`.
 
+## Device settings, verified against live hardware
+
+Tested against a real, activated display, each write read back and restored.
+
+**Display settings live on the device, not the frame.** `PUT /api/frames/{id}`
+accepts `brightness`, `sleeps_at`, `slideshow_speed`, `show_caption` and the
+rest, returns `200` — and applies **none** of them. The same fields sent to
+`PUT /api/frames/{frameId}/devices/{deviceId}` work. A silent no-op is the worst
+kind of failure for a client, so `update_frame()` carries a warning and
+`update_device()` is the method to reach for.
+
+**Writable on a device** (all verified, changed and restored): `name`,
+`brightness`, `nightlight`, `nightlight_brightness`, `sleep_sound_volume`,
+`sleeps_at`, `wakes_at`, `slideshow_speed`, `show_caption`, `blur_effect`,
+`side_by_side`, `show_heart`.
+
+**`nightlight_color` is an enum.** Accepted: `off`, `red`, `orange`, `yellow`,
+`green`, `blue`, `pink`. Rejected with `422 Nightlight color is not included in
+the list`: `white`, `warm`, `purple`. Modeled as `NightlightColor`.
+
+**`sleep_mode` accepts only its current value.** Every other candidate —
+`off`, `nightlight`, `dim`, `clock_only`, `photo`, `sleep_sound` — returns
+**HTTP 500**, not a 422. A server error rather than a validation error hints the
+other modes need something else configured first, so treat this field as
+read-only until that is understood.
+
+**Renaming a frame is blocked for activated hardware:**
+`422 Contact help@myskylight.com to rename this device`. It succeeds on a frame
+with no display attached, which is why the earlier write testing missed it.
+
 ## Known gaps
 
-Device writes (rename, factory reset, alarms) are untested — the test frame has
-no device attached, and a reset is not something to fire at a real one.
-Account-level writes (`update_user`, `delete_user`, notification toggles) are
-untested too, having no clean undo.
+Device **alarms** are untested: the display has none configured, and creating
+one risks it audibly ringing. `reset_device` (factory reset) and `delete_device`
+(unpairing) are deliberately not exercised, and `reset_device` is not
+implemented at all. Account-level writes (`update_user`, `delete_user`,
+notification toggles) are untested too, having no clean undo.

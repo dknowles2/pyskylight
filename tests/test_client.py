@@ -344,3 +344,32 @@ async def test_non_dict_error_body(client, api):
     with pytest.raises(ApiError) as excinfo:
         await client.get_user()
     assert excinfo.value.errors == []
+
+
+# --- device settings ---------------------------------------------------------
+
+
+async def test_update_device_sends_a_flat_body(client, api):
+    api.queue({"data": {"type": "device", "id": "9", "attributes": {"brightness": 180}}})
+    device = await client.update_device(FRAME, 9, brightness=180, nightlight=True)
+
+    assert device.brightness == 180
+    assert api.last.method == "PUT"
+    assert api.last.path == f"/api/frames/{FRAME}/devices/9"
+    assert api.last.body == {"brightness": 180, "nightlight": True}
+
+
+async def test_rename_device_goes_through_update_device(client, api):
+    api.queue({"data": {"type": "device", "id": "9", "attributes": {"name": "Bedroom"}}})
+    device = await client.rename_device(FRAME, 9, "Bedroom")
+
+    assert device.name == "Bedroom"
+    assert api.last.body == {"name": "Bedroom"}
+
+
+async def test_nightlight_colors_are_enumerated():
+    from pyskylight.models import NightlightColor
+
+    # The set accepted by a live display; white, warm and purple are refused.
+    assert NightlightColor.ALL == ("off", "red", "orange", "yellow", "green", "blue", "pink")
+    assert NightlightColor.OFF in NightlightColor.ALL
