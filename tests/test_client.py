@@ -264,6 +264,28 @@ async def test_uncomplete_chore_omits_instance_date_when_unset(client, api):
     assert api.last.body == {"status": "pending"}
 
 
+async def test_completing_a_timed_chore_sends_instance_time(client, api):
+    # A date alone does not identify the occurrence of a chore that repeats at a
+    # time of day: the live API answers 422 instance_time can't be blank.
+    api.queue({"data": {"type": "chore", "id": "9", "attributes": {}}})
+    await client.complete_chore(FRAME, 9, instance_date="2026-08-09", instance_time="06:00")
+    assert api.last.body == {
+        "status": "complete",
+        "instance_date": "2026-08-09",
+        "instance_time": "06:00",
+    }
+
+
+async def test_uncompleting_a_timed_chore_sends_instance_time(client, api):
+    api.queue({"data": {"type": "chore", "id": "9", "attributes": {}}})
+    await client.uncomplete_chore(FRAME, 9, instance_date="2026-08-09", instance_time="20:00")
+    assert api.last.body == {
+        "status": "pending",
+        "instance_date": "2026-08-09",
+        "instance_time": "20:00",
+    }
+
+
 async def test_move_chore_requires_before_or_after(client, api):
     api.queue({})
     await client.move_chore(FRAME, 9, after=10)
