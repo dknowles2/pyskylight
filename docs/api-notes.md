@@ -232,7 +232,16 @@ nudges, and reward points all take `category_ids`.
 `"complete"` and `"pending"` — **not** `"completed"`, and not `"skipped"`, both
 of which fail `status is not included in the list`. `instance_date` is required
 for recurring chores and rejected for one-time ones. `category_id` is rejected
-outright (`must be blank`).
+outright (`must be blank`) — except on an up-for-grabs chore, where it is what
+records who claimed it.
+
+**`instance_time` is required too, for a chore with a time of day.** Verified on
+a live frame: a recurring chore with `start_time: "06:00"` answers `422
+instance_time can't be blank` when only `instance_date` is sent. Pass
+`start_time` back unchanged — `"06:00"` is accepted, and the value is what
+distinguishes the two occurrences of a chore that repeats morning and evening.
+The occurrence id shows the same thing: an untimed chore is
+`"<chore_id>-<date>"`, a timed one `"<chore_id>-<date>-<HHMM>"`.
 
 **`apply_to` is conditional.** `DELETE /chores/{id}` rejects it on a one-time
 chore with `400 one-time chores should not have a value for apply_to`, and needs

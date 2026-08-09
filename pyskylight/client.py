@@ -613,6 +613,7 @@ class Skylight:
         status: str,
         *,
         instance_date: date | str | None = None,
+        instance_time: str | None = None,
         **fields: Any,
     ) -> Chore:
         """Mark a chore complete or pending.
@@ -626,6 +627,11 @@ class Skylight:
             instance_date: Which occurrence to act on. Required for recurring
                 chores (``422 instance_date can't be blank``) and rejected for
                 one-time ones (``422 instance_date must be blank``).
+            instance_time: Which occurrence to act on when the chore has a time
+                of day — pass :attr:`~pyskylight.models.Chore.start_time`
+                unchanged, in ``"HH:MM"``. A date alone does not identify the
+                occurrence of a timed chore, and omitting this is
+                ``422 instance_time can't be blank``.
             **fields: Any other completion fields, passed through as-is.
 
         Note:
@@ -645,6 +651,7 @@ class Skylight:
                 json=_body(
                     status=status,
                     instance_date=_fmt(instance_date) if instance_date is not None else None,
+                    instance_time=instance_time,
                     **fields,
                 ),
             )
@@ -656,6 +663,7 @@ class Skylight:
         chore_id: str | int,
         *,
         instance_date: date | str | None = None,
+        instance_time: str | None = None,
         **fields: Any,
     ) -> Chore:
         """Mark a chore complete.
@@ -664,10 +672,17 @@ class Skylight:
             frame_id: The frame the chore belongs to.
             chore_id: The underlying chore id.
             instance_date: Required for recurring chores, rejected for one-time.
+            instance_time: Required for a chore with a time of day. Pass
+                :attr:`~pyskylight.models.Chore.start_time` unchanged.
             **fields: Any other completion fields.
         """
         return await self.set_chore_status(
-            frame_id, chore_id, ChoreStatus.COMPLETE, instance_date=instance_date, **fields
+            frame_id,
+            chore_id,
+            ChoreStatus.COMPLETE,
+            instance_date=instance_date,
+            instance_time=instance_time,
+            **fields,
         )
 
     async def uncomplete_chore(
@@ -676,6 +691,7 @@ class Skylight:
         chore_id: str | int,
         *,
         instance_date: date | str | None = None,
+        instance_time: str | None = None,
         **fields: Any,
     ) -> Chore:
         """Mark a chore pending again.
@@ -684,10 +700,17 @@ class Skylight:
             frame_id: The frame the chore belongs to.
             chore_id: The underlying chore id.
             instance_date: Required for recurring chores, rejected for one-time.
+            instance_time: Required for a chore with a time of day. Pass
+                :attr:`~pyskylight.models.Chore.start_time` unchanged.
             **fields: Any other completion fields.
         """
         return await self.set_chore_status(
-            frame_id, chore_id, ChoreStatus.PENDING, instance_date=instance_date, **fields
+            frame_id,
+            chore_id,
+            ChoreStatus.PENDING,
+            instance_date=instance_date,
+            instance_time=instance_time,
+            **fields,
         )
 
     # --------------------------------------------------------------- task box
