@@ -33,6 +33,7 @@ from .models import (
     Frame,
     ListItem,
     MealCategory,
+    Message,
     Nudge,
     Recipe,
     Reward,
@@ -1347,13 +1348,25 @@ class Skylight:
 
     # ------------------------------------------------------ photos & messages
 
-    async def get_messages(self, frame_id: str | int, **params: Any) -> _JSON:
-        """List the frame's photo/message feed."""
-        return await self._get(f"{API_PREFIX}/frames/{frame_id}/messages", **params)
+    async def get_messages(self, frame_id: str | int, **params: Any) -> list[Message]:
+        """List the frame's photo feed, newest first.
 
-    async def get_message(self, frame_id: str | int, message_id: str | int) -> _JSON:
+        Args:
+            frame_id: The frame to query.
+            **params: Query parameters. ``page`` selects a page; the size is
+                fixed at 30 and is not negotiable — ``per_page`` and ``limit``
+                are both accepted and ignored. The response's
+                ``meta.num_pages`` says how many there are.
+        """
+        return Message.from_document(
+            await self._get(f"{API_PREFIX}/frames/{frame_id}/messages", **params)
+        )
+
+    async def get_message(self, frame_id: str | int, message_id: str | int) -> Message:
         """Get one message."""
-        return await self._get(f"{API_PREFIX}/frames/{frame_id}/messages/{message_id}")
+        return Message.one_from_document(
+            await self._get(f"{API_PREFIX}/frames/{frame_id}/messages/{message_id}")
+        )
 
     async def update_message_caption(
         self, frame_id: str | int, message_id: str | int, caption: str

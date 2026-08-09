@@ -263,6 +263,26 @@ list items.
 and adding a recipe: the default took all three items and the second stayed
 empty. A client offering to pick a list would be lying.
 
+## The photo feed, verified against a live account
+
+Skylight calls photos **messages**. `GET /frames/{id}/messages` returns them
+newest first, 30 to a page, with `meta.current_page` and `meta.num_pages` — 180
+photos across 6 pages on the account tested.
+
+**The page size is not negotiable.** `page` selects a page; `per_page` and
+`limit` are both accepted and ignored, and a JSON:API-style `page[size]` is a
+404. So a client wanting the newest photo asks for page 1 and takes the first
+entry.
+
+**Asset URLs are signed and expire.** `asset_url` and `thumbnail_url` are
+CloudFront URLs carrying an `Expires` roughly a week out, minted fresh on each
+read — fetch them, do not store them.
+
+Every message observed had `asset_type: "photo"`, and captions were empty
+throughout, so the field is real but unexercised on that account. Frames do
+support video, so other asset types presumably exist and are not characterised
+here.
+
 ## Nudges, verified against a test frame
 
 A nudge is a spoken reminder: the frame reads the `body` aloud at `deliver_at`,
