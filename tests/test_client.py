@@ -157,6 +157,35 @@ async def test_get_list_resolves_items_and_sections(client, api):
     assert grocery.sections == [{"name": "Produce"}]
 
 
+async def test_get_messages_is_the_photo_feed(client, api):
+    api.queue(
+        {
+            "data": [
+                {
+                    "type": "message",
+                    "id": "1824704026",
+                    "attributes": {
+                        "asset_type": "photo",
+                        "asset_url": "https://cdn.example/photo.jpg?Expires=1786752000",
+                        "thumbnail_url": "https://cdn.example/thumb.jpg?Expires=1786752000",
+                        "caption": "Beach day",
+                        "created_at": "2026-08-08T21:43:58.947Z",
+                        "from_email": "gran@example.com",
+                    },
+                }
+            ],
+            "meta": {"current_page": 1, "num_pages": 6},
+        }
+    )
+    messages = await client.get_messages(FRAME, page=2)
+
+    assert [m.caption for m in messages] == ["Beach day"]
+    assert messages[0].asset_type == "photo"
+    assert messages[0].created_at.year == 2026
+    # The page size is fixed at 30; only `page` does anything.
+    assert api.last.query == {"page": "2"}
+
+
 async def test_get_meal_recipes_resolves_its_category(client, api):
     api.queue(
         {

@@ -28,6 +28,7 @@ __all__ = [
     "ListItemStatus",
     "ListKind",
     "MealCategory",
+    "Message",
     "NightlightColor",
     "Nudge",
     "Recipe",
@@ -265,6 +266,29 @@ class SkylightList(ApiObject):
     list_item_ids: list[str] = field(default_factory=list, metadata=relationships("list_items"))
     items: list[ListItem] = field(default_factory=list, compare=False)
     sections: list[dict[str, Any]] = field(default_factory=list, compare=False)
+
+
+@dataclass(frozen=True, kw_only=True)
+class Message(ApiObject):
+    """A photo sent to the frame.
+
+    Skylight calls the photo feed "messages", and every one observed on a live
+    account had ``asset_type`` of ``"photo"`` — videos are a frame feature, so
+    other values presumably exist and are not yet characterised.
+
+    The URLs are signed and expire, so they are things to fetch rather than
+    things to store; re-reading the message mints fresh ones.
+    """
+
+    caption: str | None = None
+    asset_type: str | None = None
+    asset_url: str | None = None
+    thumbnail_url: str | None = None
+    created_at: datetime | None = None
+    destroyed_at: datetime | None = None
+    sender_id: int | None = None
+    from_email: str | None = None
+    comments_count: int | None = None
 
 
 @dataclass(frozen=True, kw_only=True)
