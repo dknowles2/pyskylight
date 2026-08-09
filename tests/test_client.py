@@ -418,17 +418,42 @@ async def test_empty_and_non_json_bodies(client, api):
         ({"error_description": "described"}, "described"),
         ({"error": "short"}, "short"),
         ({"message": "messaged"}, "messaged"),
-        ({"errors": {"status": ["is not included in the list"]}}, None),
+        # The per-field shape. The field name is half the message: "must be
+        # blank" on its own does not say which field, and that is exactly the
+        # case the chore completions endpoint returns.
+        ({"errors": {"status": ["is not included in the list"]}}, "status is not included"),
+        ({"errors": {"instance_date": ["must be blank"]}}, "instance_date must be blank"),
+        (
+            {"errors": {"summary": ["can't be blank"], "start": ["is invalid"]}},
+            "summary can't be blank; start is invalid",
+        ),
+        # A field whose complaint is not wrapped in a list.
+        ({"errors": {"base": "boom"}}, "base boom"),
+        ({"errors": [42]}, "42"),
     ],
 )
 async def test_error_message_extraction(client, api, body, expected):
     api.queue(body, status=422)
     with pytest.raises(ApiError) as excinfo:
         await client.get_user()
-    if expected is not None:
-        assert expected in str(excinfo.value)
+    assert expected in str(excinfo.value)
     assert excinfo.value.status == 422
     assert excinfo.value.url.endswith("/api/user")
+
+
+async def test_field_errors_are_flattened_onto_the_exception(client, api):
+    api.queue({"errors": {"instance_date": ["must be blank"]}}, status=422)
+    with pytest.raises(ApiError) as excinfo:
+        await client.get_user()
+    assert excinfo.value.errors == ["instance_date must be blank"]
+
+
+async def test_unrecognized_error_body_falls_back_to_the_status(client, api):
+    api.queue({"nothing": "we know about"}, status=422)
+    with pytest.raises(ApiError) as excinfo:
+        await client.get_user()
+    assert excinfo.value.status == 422
+    assert excinfo.value.errors == []
 
 
 async def test_non_dict_error_body(client, api):

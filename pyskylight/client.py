@@ -232,7 +232,7 @@ class Skylight:
                 return _RETRY
 
             raw_errors = body.get("errors") if isinstance(body, dict) else None
-            errors = raw_errors if isinstance(raw_errors, list) else None
+            errors = _flatten_errors(raw_errors) or None
             message = _error_message(body) or resp.reason or "request failed"
             error_type: type[ApiError] = ApiError
             if resp.status in (401, 403):
@@ -1505,16 +1505,47 @@ class _Retry:
 _RETRY = _Retry()
 
 
+def _flatten_errors(errors: Any) -> list[str]:
+    """Reduce an ``errors`` payload to a flat list of readable strings.
+
+    The API uses two shapes and does not say which it will pick. A whole-request
+    complaint arrives as a list::
+
+        {"errors": ["only repeating chores can be skipped"]}
+
+    while a per-field one arrives as a mapping of field to complaints, which is
+    what the chore completions endpoint returns::
+
+        {"errors": {"instance_date": ["must be blank"]}}
+
+    The field name is the useful half of that second shape — "must be blank"
+    alone says nothing — so it is kept, joined to its message the way the
+    sentence reads.
+    """
+    if isinstance(errors, dict):
+        return [
+            f"{field} {message}" if isinstance(message, str) else f"{field} {message!r}"
+            for field, messages in errors.items()
+            for message in (messages if isinstance(messages, list) else [messages])
+        ]
+    if isinstance(errors, list):
+        out = []
+        for error in errors:
+            if isinstance(error, str):
+                out.append(error)
+            elif isinstance(error, dict):
+                out.append(str(error.get("detail") or error.get("title") or error))
+            else:
+                out.append(str(error))
+        return out
+    return []
+
+
 def _error_message(body: Any) -> str | None:
     if not isinstance(body, dict):
         return None
-    errors = body.get("errors")
-    if isinstance(errors, list) and errors:
-        first = errors[0]
-        if isinstance(first, str):
-            return "; ".join(e for e in errors if isinstance(e, str))
-        if isinstance(first, dict):
-            return str(first.get("detail") or first.get("title") or first)
+    if messages := _flatten_errors(body.get("errors")):
+        return "; ".join(messages)
     for key in ("error_description", "error", "message"):
         if isinstance(value := body.get(key), str):
             return value
