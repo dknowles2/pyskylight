@@ -94,6 +94,33 @@ Facts only the OpenAPI spec and its examples record:
 Everything the spec marks `additionalProperties: true` — which is nearly every
 resource — is preserved verbatim on each model as `.attributes`.
 
+## Error bodies come in two shapes
+
+Undocumented, and worth knowing because half of them are useless without the
+field name. A complaint about the request as a whole arrives as a list of
+sentences:
+
+```json
+{"errors": ["only repeating chores can be skipped"]}
+```
+
+A complaint about particular fields arrives as a mapping instead, and the
+message on its own says nothing:
+
+```json
+{"errors": {"instance_date": ["must be blank"]}}
+{"errors": {"category_id": ["must be blank"]}}
+{"errors": {"summary": ["can't be blank"]}}
+```
+
+Both were captured from a 422 on a test frame. Which shape you get depends on
+the endpoint, not the status: `PUT .../chores/{id}/completions` and
+`PUT .../chores/{id}` return the mapping, while a rejected `status` value on the
+same completions endpoint returns the list.
+
+`ApiError` normalizes both — `.errors` is always a list of strings, with the
+field name joined onto its message, and `str(error)` is those joined with `; `.
+
 ## Verified against a live account
 
 Every non-destructive (GET) call in pyskylight was run against a real Skylight

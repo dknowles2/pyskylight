@@ -26,7 +26,18 @@ class AuthenticationError(SkylightError):
 
 
 class ApiError(SkylightError):
-    """Raised when the API returns an unsuccessful HTTP status."""
+    """Raised when the API returns an unsuccessful HTTP status.
+
+    Attributes:
+        status: The HTTP status code.
+        message: The API's explanation, or the HTTP reason phrase if it gave
+            none. This is what :func:`str` shows.
+        errors: The individual complaints behind ``message``, normalized to
+            strings. The API reports a per-field rejection as a mapping —
+            ``{"instance_date": ["must be blank"]}`` — and a whole-request one
+            as a list; both arrive here as ``["instance_date must be blank"]``.
+        url: The URL that was requested.
+    """
 
     def __init__(
         self,
