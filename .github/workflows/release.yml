@@ -30,7 +30,7 @@ jobs:
           # hatch-vcs reads the version from the git tags, which a shallow
           # clone does not have.
           fetch-depth: 0
-      - uses: astral-sh/setup-uv@v9.0.0
+      - uses: astral-sh/setup-uv@v10.4.0
         with:
           enable-cache: true
 
