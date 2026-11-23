@@ -1,0 +1,20 @@
+version: 2
+updates:
+  # Keeps uv.lock current as well as the floors in pyproject.toml.
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      # Dev tooling churns often and is not shipped to users, so a single PR
+      # per week keeps the noise down.
+      dev:
+        dependency-type: "development"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions:
+        patterns: ["*"]
